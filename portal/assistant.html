@@ -1,0 +1,435 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Assistant · Self-Insure</title>
+  <script src="theme.js"></script>
+  <link rel="stylesheet" href="styles.css" />
+
+  <!-- Screen-scoped styles only: compose from the shared kit, never override tokens.
+       Every color is a var() so both themes stay flawless. -->
+  <style>
+    /* The assistant page fills the content area minus its own padding. */
+    .asst-wrap {
+      display: grid;
+      grid-template-columns: 264px 1fr;
+      gap: 22px;
+      /* topbar 60 + content vertical padding (28 top + 80 bottom) = 168; clamp for short viewports */
+      height: calc(100vh - var(--topbar-h) - 108px);
+      min-height: 480px;
+    }
+
+    /* ---- left rail ---- */
+    .asst-rail {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      min-height: 0;
+      overflow-y: auto;
+      padding-right: 2px;
+    }
+    .asst-rail::-webkit-scrollbar { width: 8px; }
+    .asst-rail::-webkit-scrollbar-thumb { background: var(--border); border-radius: 99px; }
+
+    .rail-hero {
+      padding: 18px;
+      border-radius: var(--r-card);
+      background: var(--ai-tint);
+      border: 1px solid var(--ai-border);
+      position: relative;
+      overflow: hidden;
+    }
+    .rail-hero .rh-spark {
+      width: 38px; height: 38px; border-radius: 11px;
+      background: var(--ai); color: var(--ai-ink);
+      display: grid; place-items: center; margin-bottom: 12px;
+      box-shadow: 0 6px 18px -8px var(--ai-glow);
+    }
+    .rail-hero .rh-spark svg { width: 20px; height: 20px; }
+    .rail-hero h2 {
+      font-family: var(--font-display); font-weight: 600;
+      font-size: 21px; line-height: 1.15; letter-spacing: -.01em; margin: 0 0 5px;
+    }
+    .rail-hero p { font-size: 12.5px; line-height: 1.5; color: var(--text-2); margin: 0; }
+    .rail-hero .rh-orbit {
+      position: absolute; right: -36px; top: -36px; width: 120px; height: 120px;
+      border-radius: 50%; border: 1px solid var(--ai-border); opacity: .5;
+      pointer-events: none;
+    }
+    .rail-hero .rh-orbit::before {
+      content: ""; position: absolute; inset: 16px; border-radius: 50%;
+      border: 1px solid var(--ai-border);
+    }
+
+    .rail-block { }
+    .rail-label {
+      font-size: 11px; font-weight: 600; letter-spacing: .07em;
+      text-transform: uppercase; color: var(--text-3);
+      padding: 0 4px 8px; display: flex; align-items: center; justify-content: space-between;
+    }
+    .rail-topics { display: flex; flex-direction: column; gap: 2px; }
+    .rail-topic {
+      display: flex; align-items: center; gap: 10px;
+      width: 100%; text-align: left;
+      padding: 9px 11px; border-radius: 10px;
+      background: transparent; border: 1px solid transparent;
+      color: var(--text); font-size: 13px; font-family: inherit;
+      cursor: pointer; transition: background .14s var(--ease), border-color .14s var(--ease);
+    }
+    .rail-topic:hover { background: var(--ai-tint); border-color: var(--ai-border); }
+    .rail-topic:focus-visible { outline: 2px solid var(--ai); outline-offset: 1px; }
+    .rail-topic .rt-ico {
+      width: 28px; height: 28px; flex: 0 0 28px; border-radius: 8px;
+      background: var(--surface-2); color: var(--ai);
+      display: grid; place-items: center;
+    }
+    .rail-topic:hover .rt-ico { background: var(--ai); color: var(--ai-ink); }
+    .rail-topic .rt-ico svg { width: 15px; height: 15px; }
+    .rail-topic .rt-txt { flex: 1; min-width: 0; line-height: 1.25; }
+
+    .rail-threads { display: flex; flex-direction: column; gap: 2px; }
+    .rail-thread {
+      display: flex; align-items: center; gap: 9px;
+      padding: 8px 10px; border-radius: 9px;
+      color: var(--text-2); font-size: 12.5px; text-decoration: none;
+      cursor: pointer; transition: background .14s var(--ease), color .14s var(--ease);
+    }
+    .rail-thread:hover { background: var(--surface-2); color: var(--text); }
+    .rail-thread .th-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--text-3); flex: 0 0 6px; }
+    /* live = an open/streaming thread (pulses); resolved = closed positively (steady mint, no pulse) */
+    .rail-thread.live .th-dot { background: var(--ai); box-shadow: 0 0 0 3px var(--ai-tint); animation: thpulse 2s var(--ease) infinite; }
+    .rail-thread.resolved .th-dot { background: var(--ai); }
+    @keyframes thpulse { 0%,100% { box-shadow: 0 0 0 3px var(--ai-tint); } 50% { box-shadow: 0 0 0 5px var(--ai-tint); } }
+    @media (prefers-reduced-motion: reduce) { .rail-thread.live .th-dot { animation: none; } }
+    .rail-thread span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .rail-thread .th-time { margin-left: auto; color: var(--text-3); font-size: 11px; flex: 0 0 auto; }
+
+    /* simulated-assistant tooltip note */
+    .demo-note {
+      margin-top: auto;
+      display: flex; align-items: flex-start; gap: 9px;
+      padding: 11px 12px; border-radius: 11px;
+      background: var(--surface-2); border: 1px solid var(--border);
+      font-size: 11.5px; line-height: 1.45; color: var(--text-2);
+    }
+    .demo-note svg { width: 15px; height: 15px; flex: 0 0 15px; color: var(--info); margin-top: 1px; }
+
+    /* ---- main chat column ---- */
+    /* .asst-col is the non-clipping anchor: it holds the badge (which must escape the
+       card's overflow:hidden) and the clipped .asst-main, and fills the grid cell. */
+    .asst-col {
+      position: relative;
+      min-height: 0;
+      display: flex; flex-direction: column;
+    }
+    .asst-main {
+      flex: 1 1 auto;
+      min-height: 0;
+      display: flex; flex-direction: column;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--r-card);
+      box-shadow: var(--shadow);
+      overflow: hidden;
+      position: relative;
+    }
+    /* mountPage renders: .chat-head + .chat-scroll(flex:1) + .chat-chips + .composer */
+    #asst-chat { display: flex; flex-direction: column; height: 100%; min-height: 0; }
+    /* Right padding reserves room for the floating "Demo assistant" badge so the
+       header title/subtitle never run under it (badge ≈150px + gutters). */
+    #asst-chat .chat-head { padding: 15px 20px; padding-right: 168px; }
+    #asst-chat .chat-head .spark { width: 34px; height: 34px; border-radius: 10px; }
+    #asst-chat .chat-head .spark svg { width: 19px; height: 19px; }
+    #asst-chat .chat-head .ch-title { font-size: 15px; }
+    #asst-chat .chat-head .ch-sub { font-size: 11.5px; }
+    /* roomier message column on the full page */
+    #asst-chat .chat-scroll { padding: 26px 28px; gap: 16px; scroll-behavior: smooth; }
+    #asst-chat .chat-scroll::-webkit-scrollbar { width: 9px; }
+    #asst-chat .chat-scroll::-webkit-scrollbar-thumb { background: var(--border); border-radius: 99px; }
+    #asst-chat .msg { max-width: 76%; }
+    #asst-chat .bubble { font-size: 14px; }
+    #asst-chat .chat-chips { padding: 6px 28px 0; }
+    #asst-chat .composer { padding: 16px 22px; }
+    #asst-chat .composer textarea { font-size: 14px; min-height: 44px; padding: 11px 14px; }
+    #asst-chat .composer .send { width: 44px; height: 44px; flex-basis: 44px; }
+
+    /* a header accent badge that lives next to the engine's own head, kept subtle.
+       Anchored to .asst-col (NOT the clipped .asst-main) so the tooltip can't be cut off. */
+    .head-badge {
+      position: absolute; top: 17px; right: 20px; z-index: 5;
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 5px 10px; border-radius: 999px;
+      background: var(--ai-tint); border: 1px solid var(--ai-border);
+      color: var(--ai-text); font-size: 11px; font-weight: 600;
+      cursor: default;
+    }
+    .head-badge svg { width: 12px; height: 12px; flex: 0 0 12px; }
+    .head-badge .hb-pop {
+      position: absolute; top: calc(100% + 8px); right: 0;
+      width: 220px; padding: 10px 12px; z-index: 6;
+      background: var(--raised); border: 1px solid var(--border);
+      border-radius: 10px; box-shadow: var(--shadow-lg);
+      font-size: 11.5px; font-weight: 450; line-height: 1.5; color: var(--text-2);
+      opacity: 0; transform: translateY(-4px); pointer-events: none;
+      transition: opacity .16s var(--ease), transform .16s var(--ease);
+    }
+    .head-badge:hover .hb-pop, .head-badge:focus-visible .hb-pop { opacity: 1; transform: none; }
+
+    /* big intro prompt grid (shown only before the first user turn) — lives inside the scroll */
+    .intro-wrap { animation: introIn .3s var(--ease) both; }
+    @keyframes introIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+    .intro-prompts {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 12px;
+      margin: 6px 0 2px;
+    }
+    .intro-lead {
+      font-size: 12px; color: var(--text-3); font-weight: 600;
+      letter-spacing: .06em; text-transform: uppercase; margin: 6px 0 2px;
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .intro-wrap { animation: none; }
+      #asst-chat .chat-scroll { scroll-behavior: auto; }
+      .ip-card:hover, .rail-topic:hover { transform: none; }
+    }
+    .ip-card {
+      text-align: left; cursor: pointer;
+      padding: 14px 15px; border-radius: 12px;
+      background: var(--surface-2); border: 1px solid var(--border);
+      color: var(--text); font-family: inherit;
+      display: flex; align-items: center; gap: 12px;
+      transition: transform .14s var(--ease), border-color .14s var(--ease), background .14s var(--ease);
+    }
+    .ip-card:hover { transform: translateY(-2px); border-color: var(--ai-border); background: var(--ai-tint); }
+    .ip-card:focus-visible { outline: 2px solid var(--ai); outline-offset: 2px; }
+    .ip-card .ip-ico {
+      width: 32px; height: 32px; flex: 0 0 32px; border-radius: 9px;
+      background: var(--ai-tint); color: var(--ai);
+      display: grid; place-items: center;
+    }
+    .ip-card:hover .ip-ico { background: var(--ai); color: var(--ai-ink); }
+    .ip-card .ip-ico svg { width: 17px; height: 17px; }
+    .ip-card .ip-q { font-size: 13.5px; font-weight: 500; line-height: 1.3; }
+    .ip-card .ip-hint { font-size: 11.5px; color: var(--text-2); margin-top: 2px; }
+
+    /* responsive: collapse the rail */
+    @media (max-width: 1040px) {
+      .asst-wrap { grid-template-columns: 1fr; height: calc(100vh - var(--topbar-h) - 96px); }
+      .asst-rail { display: none; }
+    }
+    @media (max-width: 620px) {
+      .intro-prompts { grid-template-columns: 1fr; padding: 4px 18px 16px; }
+      #asst-chat .chat-scroll { padding: 20px 18px; }
+      #asst-chat .msg { max-width: 86%; }
+      /* Collapse the badge to its icon so it no longer overlaps the header title,
+         and shrink the reserved header padding to match. */
+      .head-badge { top: 14px; right: 16px; padding: 6px; }
+      .head-badge .hb-txt { display: none; }
+      #asst-chat .chat-head { padding-right: 52px; }
+      .head-badge .hb-pop { width: 180px; }
+    }
+  </style>
+  <link rel="icon" type="image/svg+xml" href="favicon.svg">
+</head>
+<body>
+  <div data-content data-wide>
+
+    <!-- page heading -->
+    <div class="section" style="margin-bottom:18px;display:flex;align-items:flex-end;justify-content:space-between;gap:16px;flex-wrap:wrap;">
+      <div>
+        <div class="eyebrow" style="margin-bottom:6px;">Ask Self-Insure</div>
+        <h2 class="display" style="font-size:28px;line-height:1.1;">Your policy, answered.</h2>
+        <p class="muted" style="margin-top:5px;max-width:560px;">
+          A conversation that knows <strong style="color:var(--text);">Eleanor Marsh</strong>'s account —
+          coverage, payments, your <span class="ai-text" style="font-weight:600;">$7,500</span> return of premium, and claim
+          <strong style="color:var(--text);">CLM-31182</strong> — down to the dollar.
+        </p>
+      </div>
+      <button class="btn btn-ai-ghost btn-sm" id="new-convo">
+        <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>
+        New conversation
+      </button>
+    </div>
+
+    <div class="asst-wrap">
+
+      <!-- LEFT RAIL -->
+      <aside class="asst-rail" aria-label="Assistant topics and history">
+
+        <div class="rail-hero">
+          <div class="rh-orbit"></div>
+          <div class="rh-spark">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l1.6 4.6L18 9l-4.4 1.4L12 15l-1.6-4.6L6 9l4.4-1.4z"/><path d="M19 14l.8 2.2L22 17l-2.2.8L19 20l-.8-2.2L16 17l2.2-.8z"/></svg>
+          </div>
+          <h2>Self-Insure AI</h2>
+          <p>Instant, account-aware answers. Powered by your live policy data — no waiting, no hold music.</p>
+        </div>
+
+        <div class="rail-block">
+          <div class="rail-label">Suggested topics</div>
+          <div class="rail-topics" id="rail-topics"></div>
+        </div>
+
+        <div class="rail-block">
+          <div class="rail-label">Recent threads</div>
+          <!-- Rendered from SI.account so labels (claim status, card last-4) never drift. -->
+          <div class="rail-threads" id="rail-threads"></div>
+        </div>
+
+        <div class="demo-note">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 16v-4M12 8h.01"/></svg>
+          <div>This is a simulated demo assistant. It answers from your account data on this device and never sends your information anywhere.</div>
+        </div>
+      </aside>
+
+      <!-- MAIN CHAT -->
+      <!-- The badge lives OUTSIDE .asst-main (which clips with overflow:hidden) so its
+           hover tooltip is never clipped; it's anchored over the chat header by .asst-col. -->
+      <div class="asst-col">
+        <div class="head-badge" tabindex="0" aria-label="About this assistant">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l1.6 4.6L18 9l-4.4 1.4L12 15l-1.6-4.6L6 9l4.4-1.4z"/></svg>
+          <span class="hb-txt">Demo assistant</span>
+          <div class="hb-pop">Simulated for this demo — responses are generated locally from your policy data and stream like a live model. No network calls.</div>
+        </div>
+        <section class="asst-main">
+          <div id="asst-chat"></div>
+        </section>
+      </div>
+
+    </div>
+  </div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+  <script src="account.js"></script>
+  <script src="intents.js"></script>
+  <script src="app.js"></script>
+  <script>
+    document.addEventListener("selfinsure:ready", function () {
+      var A = SI.account;
+
+      /* ---- mount the shared full-page assistant engine ---- */
+      var container = document.getElementById("asst-chat");
+      var api = SI.assistant.mountPage(container);   // { scroll, chips, send }
+
+      /* ---- left-rail suggested topics (seed + auto-send via the shared engine) ---- */
+      var TOPICS = [
+        { icon: "card",   q: "Am I up to date on payments?" },
+        { icon: "shield", q: "What is my water-damage coverage?" },
+        { icon: "rop",    q: "How much do I get back and when?" },
+        { icon: "claim",  q: "Help me file a claim" },
+        { icon: "spark",  q: "Why was I approved?" }
+      ];
+      document.getElementById("rail-topics").innerHTML = TOPICS.map(function (t) {
+        return '<button class="rail-topic" data-ask="' + t.q.replace(/"/g, "&quot;") + '">' +
+          '<span class="rt-ico">' + SI.icon(t.icon) + '</span>' +
+          '<span class="rt-txt">' + t.q + '</span></button>';
+      }).join("");
+
+      /* ---- big intro prompt grid (only while the conversation is just the opener) ----
+         Injected INTO the chat scroll after the opener bubble, removed on first ask. */
+      var INTRO = [
+        { icon: "card",   q: "Am I up to date on payments?", hint: "Balance, autopay & next bill" },
+        { icon: "shield", q: "What is my water-damage coverage?", hint: "What's covered, what's not" },
+        { icon: "rop",    q: "How much do I get back and when?", hint: "Your $7,500 return of premium" },
+        { icon: "claim",  q: "Help me file a claim", hint: "Start a guided claim in seconds" },
+        { icon: "spark",  q: "Why was I approved?", hint: "How the AI underwrote you" },
+        { icon: "doc",    q: "What does my policy cover?", hint: "Your full HO-3 coverage" }
+      ];
+      function introHTML() {
+        return '<div class="intro-wrap">' +
+          '<div class="intro-lead">Try asking</div>' +
+          '<div class="intro-prompts">' + INTRO.map(function (t) {
+            return '<button class="ip-card" data-ask="' + t.q.replace(/"/g, "&quot;") + '">' +
+              '<span class="ip-ico">' + SI.icon(t.icon) + '</span>' +
+              '<span><span class="ip-q">' + t.q + '</span><span class="ip-hint">' + t.hint + '</span></span>' +
+              '</button>';
+          }).join("") + '</div></div>';
+      }
+
+      function chatTurns() {
+        try { return JSON.parse(sessionStorage.getItem("si-chat") || "[]"); } catch (e) { return []; }
+      }
+      function hasUserAsked() {
+        return chatTurns().some(function (m) { return m.role === "user"; });
+      }
+      function removeIntro() {
+        var w = api.scroll.querySelector(".intro-wrap");
+        if (w) w.remove();
+      }
+      /* Show the intro grid inside the scroll only when the conversation is fresh. */
+      function syncIntro() {
+        removeIntro();
+        if (!hasUserAsked()) {
+          api.scroll.insertAdjacentHTML("beforeend", introHTML());
+          wireAsks();
+          api.scroll.scrollTop = api.scroll.scrollHeight;
+        }
+      }
+
+      /* ---- wire every "ask" affordance (rail + intro) to the shared engine ---- */
+      function ask(q) {
+        removeIntro();
+        api.send(q);
+        setTimeout(function () { api.scroll.scrollTop = api.scroll.scrollHeight; }, 30);
+      }
+      function wireAsks() {
+        document.querySelectorAll("[data-ask]").forEach(function (b) {
+          if (b._wired) return; b._wired = true;
+          b.addEventListener("click", function () { ask(b.getAttribute("data-ask")); });
+        });
+      }
+      wireAsks();
+      syncIntro();
+
+      /* ---- Recent threads: rendered from account data so labels never drift ----
+         The claim thread reflects the claim's REAL status (Approved → resolved, not "live"),
+         and the autopay thread reads the card's last-4 from account.js. Clicking each
+         re-asks the related question (believable, no dead ends). */
+      var claim = A.claims[0];
+      var last4 = A.billing.paymentMethod.last4;
+      var claimResolved = claim.status !== "Submitted" && claim.status !== "AI review";
+      var THREADS = [
+        {
+          label: "Roof / hail claim — " + claim.id,
+          time: claimResolved ? "Resolved" : (claim.timeline[claim.timeline.length - 1].time),
+          state: claimResolved ? "resolved" : "live",
+          q: "What's the status of my claim?"
+        },
+        { label: "Return of premium timeline", time: "Jan", state: "", q: "How much do I get back and when?" },
+        { label: "Autopay & Visa •" + last4, time: "Jun 1", state: "", q: "Update autopay on my Visa ending " + last4 },
+        { label: "Water damage coverage", time: "May", state: "", q: "Am I covered for water damage?" }
+      ];
+      document.getElementById("rail-threads").innerHTML = THREADS.map(function (t) {
+        return '<a class="rail-thread' + (t.state ? " " + t.state : "") + '" role="button" tabindex="0">' +
+          '<span class="th-dot"></span>' +
+          '<span>' + t.label + '</span>' +
+          '<span class="th-time">' + t.time + '</span></a>';
+      }).join("");
+      document.querySelectorAll("#rail-threads .rail-thread").forEach(function (t, i) {
+        t.style.cursor = "pointer";
+        function go() { ask(THREADS[i].q || "Help"); }
+        t.addEventListener("click", go);
+        t.addEventListener("keydown", function (e) {
+          if (e.key === "Enter" || e.key === " ") { e.preventDefault(); go(); }
+        });
+      });
+
+      /* ---- New conversation: clear transcript, re-mount fresh, restore intro ---- */
+      document.getElementById("new-convo").addEventListener("click", function () {
+        SI.assistant.clear();
+        api = SI.assistant.mountPage(container);   // re-renders opener into the same (now empty) container
+        syncIntro();
+        SI.ui.toast("Started a new conversation.", "ai");
+      });
+
+      /* If the user sends through the composer, drop the intro grid immediately. */
+      container.addEventListener("submit", function () { removeIntro(); }, true);
+
+      /* Keep the page chat scrolled to newest when answers stream in. */
+      window.addEventListener("selfinsure:assistant-answer", function () {
+        setTimeout(function () { if (api && api.scroll) api.scroll.scrollTop = api.scroll.scrollHeight; }, 40);
+      });
+    });
+  </script>
+</body>
+</html>
