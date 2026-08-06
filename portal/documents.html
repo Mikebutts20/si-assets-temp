@@ -1,0 +1,629 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Documents · Self-Insure</title>
+  <meta name="description" content="Self-Insure document center — declarations, policy contract, ROP addendum, digital ID card, billing statements, and your year-end summary." />
+  <script src="theme.js"></script>
+  <link rel="stylesheet" href="styles.css" />
+  <style>
+    /* ----- documents.html scoped tweaks (composed from the shared kit) ----- */
+
+    /* Header strip */
+    .doc-hero { display:flex; align-items:flex-start; justify-content:space-between; gap:20px; flex-wrap:wrap; margin-bottom:6px; }
+    .doc-hero .dh-left { min-width:0; }
+    .doc-hero .dh-actions { display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+
+    /* Search + filter toolbar */
+    .doc-toolbar {
+      position:sticky; top:var(--topbar-h); z-index:20;
+      display:flex; align-items:center; gap:12px; flex-wrap:wrap;
+      padding:12px 0 12px; margin:16px 0 8px;
+      background:color-mix(in srgb, var(--bg) 86%, transparent);
+      backdrop-filter:saturate(140%) blur(10px); -webkit-backdrop-filter:saturate(140%) blur(10px);
+    }
+    .doc-search { position:relative; flex:1 1 280px; min-width:220px; }
+    .doc-search svg { position:absolute; left:13px; top:50%; transform:translateY(-50%); width:16px; height:16px; color:var(--text-3); pointer-events:none; }
+    .doc-search input {
+      width:100%; height:40px; padding:0 36px 0 38px; border-radius:var(--r-ctrl);
+      border:1px solid var(--border); background:var(--surface-2); color:var(--text);
+      font-family:inherit; font-size:13.5px; transition:border-color .15s var(--ease), box-shadow .15s var(--ease), background .15s var(--ease);
+    }
+    .doc-search input::placeholder { color:var(--text-3); }
+    .doc-search input:focus { outline:none; border-color:var(--ai); background:var(--surface); box-shadow:0 0 0 3px var(--ai-tint); }
+    .doc-search .ds-clear {
+      position:absolute; right:8px; top:50%; transform:translateY(-50%);
+      width:24px; height:24px; border:0; border-radius:7px; background:transparent; color:var(--text-3);
+      display:none; place-items:center; cursor:pointer; font-family:inherit;
+    }
+    .doc-search .ds-clear:hover { background:var(--surface-2); color:var(--text); }
+    .doc-search.has-value .ds-clear { display:grid; }
+    .doc-search .ds-clear svg { position:static; transform:none; width:14px; height:14px; color:inherit; }
+
+    .doc-filters { display:flex; gap:6px; flex-wrap:wrap; }
+    .doc-filters .chip[aria-pressed="true"] { background:var(--ai-tint); border-color:var(--ai-border); color:var(--ai); }
+
+    /* document group */
+    .doc-group { margin-bottom:8px; }
+    .doc-group.is-empty { display:none; }
+    .doc-group .dg-head { display:flex; align-items:baseline; gap:10px; margin:18px 0 10px; }
+    .doc-group .dg-title { font-family:var(--font-display); font-size:17px; font-weight:600; color:var(--text); letter-spacing:-.01em; }
+    .doc-group .dg-count { font-size:12px; color:var(--text-3); font-variant-numeric:tabular-nums; }
+
+    /* document rows (reuses policy.html .doc-row look, tuned for a full-width card) */
+    .doc-row { display:flex; align-items:center; gap:14px; padding:14px 16px; border-bottom:1px solid var(--border-2); transition:background .14s var(--ease); }
+    .doc-row:last-child { border-bottom:0; }
+    .doc-row:hover { background:var(--surface-2); }
+    .doc-row.is-hidden { display:none; }
+    .doc-row .dr-body { flex:1; min-width:0; }
+    .doc-row .dr-name { font-size:13.5px; font-weight:600; color:var(--text); display:flex; align-items:center; gap:7px; flex-wrap:wrap; }
+    .doc-row .dr-meta { font-size:11.5px; color:var(--text-3); margin-top:2px; }
+    .doc-row .dr-actions { display:flex; gap:6px; flex-shrink:0; align-items:center; }
+    @media (max-width:560px){
+      .doc-row { flex-wrap:wrap; }
+      .doc-row .dr-actions { width:100%; padding-left:52px; }
+    }
+
+    /* tiny type tag inside a row */
+    .type-tag { font-size:10px; font-weight:700; letter-spacing:.05em; text-transform:uppercase; color:var(--text-3); border:1px solid var(--border); border-radius:6px; padding:2px 7px; }
+
+    /* empty-state when a search matches nothing */
+    .doc-empty { display:none; text-align:center; padding:48px 20px; color:var(--text-2); }
+    .doc-empty.show { display:block; }
+    .doc-empty .de-ico { width:46px; height:46px; border-radius:12px; margin:0 auto 14px; display:grid; place-items:center; background:var(--surface-2); color:var(--text-3); border:1px solid var(--border); }
+    .doc-empty .de-ico svg { width:22px; height:22px; }
+
+    /* AI assist card (right rail) */
+    .ai-assist { position:sticky; top:calc(var(--topbar-h) + 84px); }
+    .ai-assist .aa-ico { width:36px; height:36px; flex:0 0 36px; border-radius:10px; background:var(--ai-tint); color:var(--ai); display:grid; place-items:center; margin-bottom:14px; }
+    .ai-assist .aa-ico svg { width:19px; height:19px; }
+    .ai-assist .aa-chips { display:flex; flex-direction:column; gap:8px; margin-top:14px; }
+    .ai-assist .aa-chips .chip { width:100%; justify-content:flex-start; text-align:left; height:auto; padding:9px 12px; line-height:1.35; }
+
+    /* facsimile document viewer — identical "printed paper" facsimile used on policy.html.
+       Intentionally a light look in BOTH themes (it represents a physical document); the two
+       brand-coupled values are tokenised so they never drift from the design system. */
+    .facsimile {
+      --paper-ink:    #15161b;
+      --paper-accent: #0f9d63;
+      background:#fff; color:var(--paper-ink); border-radius:8px; padding:30px 32px; font-family:var(--font-ui); box-shadow:inset 0 0 0 1px rgba(0,0,0,.06);
+    }
+    .facsimile .fx-head { display:flex; justify-content:space-between; align-items:flex-start; border-bottom:2px solid var(--paper-ink); padding-bottom:14px; margin-bottom:18px; }
+    .facsimile .fx-brand { font-family:var(--font-display); font-size:22px; font-weight:600; color:#0c0d10; }
+    .facsimile .fx-tag { font-size:11px; color:#6b6760; font-style:italic; }
+    .facsimile .fx-doctype { font-size:11px; font-weight:700; letter-spacing:.08em; text-transform:uppercase; color:var(--paper-accent); text-align:right; }
+    .facsimile .fx-sub { font-size:11px; color:#8a8a85; text-align:right; margin-top:3px; }
+    .facsimile h4 { font-size:11px; font-weight:700; letter-spacing:.06em; text-transform:uppercase; color:#8a8a85; margin:18px 0 9px; }
+    .facsimile .fx-kv { display:grid; grid-template-columns:160px 1fr; gap:7px 14px; font-size:13px; }
+    .facsimile .fx-kv dt { color:#5b5b57; }
+    .facsimile .fx-kv dd { margin:0; color:var(--paper-ink); font-weight:600; }
+    .facsimile table.fx-tbl { width:100%; border-collapse:collapse; font-size:12.5px; margin-top:4px; }
+    .facsimile table.fx-tbl th { text-align:left; padding:7px 8px; background:#f6f6f4; color:#5b5b57; font-size:10.5px; text-transform:uppercase; letter-spacing:.04em; border-bottom:1px solid #e4e4e0; }
+    .facsimile table.fx-tbl td { padding:7px 8px; border-bottom:1px solid #efefec; }
+    .facsimile table.fx-tbl td.num { text-align:right; font-variant-numeric:tabular-nums; font-weight:600; }
+    .facsimile .fx-foot { margin-top:20px; padding-top:12px; border-top:1px solid #e4e4e0; font-size:10.5px; color:#8a8a85; line-height:1.5; }
+    .facsimile .fx-stamp { display:inline-block; margin-top:14px; padding:5px 11px; border:1.5px solid var(--paper-accent); color:var(--paper-accent); border-radius:6px; font-size:11px; font-weight:700; letter-spacing:.05em; text-transform:uppercase; }
+  </style>
+  <link rel="icon" type="image/svg+xml" href="favicon.svg">
+</head>
+<body>
+  <div data-content data-wide>
+
+    <!-- ============ HEADER STRIP ============ -->
+    <div class="doc-hero">
+      <div class="dh-left">
+        <div class="eyebrow" style="margin-bottom:7px;">Document center</div>
+        <h2 class="display" style="font-size:30px;">Documents</h2>
+        <p class="muted" style="margin-top:8px;max-width:54ch;line-height:1.55;">
+          Every document tied to policy <strong style="color:var(--text);" id="dh-policy">SI-OH-204871</strong> — your declarations, contract, addenda, statements, and proof of insurance. View any one or download it instantly.
+        </p>
+      </div>
+      <div class="dh-actions">
+        <span class="pill pill-ai" id="dh-paperless"><span class="dot"></span>Paperless is on</span>
+        <button class="btn btn-ghost btn-sm" id="btn-id-card">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="5" width="20" height="15" rx="2"/><path d="M16 12h.01M2 9h20"/></svg>
+          ID card
+        </button>
+      </div>
+    </div>
+
+    <!-- ============ SEARCH + FILTER TOOLBAR ============ -->
+    <div class="doc-toolbar" role="search">
+      <div class="doc-search" id="doc-search">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
+        <input type="text" id="doc-search-input" placeholder="Search documents by name or type…" aria-label="Search documents" autocomplete="off" />
+        <button class="ds-clear" id="doc-search-clear" type="button" aria-label="Clear search">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6L6 18M6 6l12 12"/></svg>
+        </button>
+      </div>
+      <div class="doc-filters" id="doc-filters" role="group" aria-label="Filter by type">
+        <button class="chip" data-filter="all" aria-pressed="true">All</button>
+        <button class="chip" data-filter="Policy" aria-pressed="false">Policy</button>
+        <button class="chip" data-filter="Billing" aria-pressed="false">Billing</button>
+        <button class="chip" data-filter="Tax" aria-pressed="false">Tax</button>
+        <button class="chip" data-filter="Proof" aria-pressed="false">Proof</button>
+      </div>
+    </div>
+
+    <div class="grid grid-12">
+      <!-- ===== LEFT: the document lists ===== -->
+      <div class="col-8">
+
+        <!-- Policy documents -->
+        <section class="doc-group" data-group="Policy">
+          <div class="dg-head">
+            <span class="dg-title">Policy documents</span>
+            <span class="dg-count" data-group-count></span>
+          </div>
+          <div class="card flush"><div data-list="Policy"></div></div>
+        </section>
+
+        <!-- Billing statements -->
+        <section class="doc-group" data-group="Billing">
+          <div class="dg-head">
+            <span class="dg-title">Billing statements</span>
+            <span class="dg-count" data-group-count></span>
+          </div>
+          <div class="card flush"><div data-list="Billing"></div></div>
+        </section>
+
+        <!-- Tax & year-end -->
+        <section class="doc-group" data-group="Tax">
+          <div class="dg-head">
+            <span class="dg-title">Tax &amp; year-end</span>
+            <span class="dg-count" data-group-count></span>
+          </div>
+          <div class="card flush"><div data-list="Tax"></div></div>
+        </section>
+
+        <!-- empty state -->
+        <div class="doc-empty" id="doc-empty">
+          <span class="de-ico">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
+          </span>
+          <div style="font-size:14px;font-weight:600;color:var(--text);">No documents match “<span id="empty-q"></span>”.</div>
+          <p class="tiny muted-3" style="margin-top:6px;">Try a different word, or <button class="link-reset" id="empty-reset" style="background:none;border:0;color:var(--ai);font-weight:600;font-family:inherit;cursor:pointer;padding:0;">clear the search</button>.</p>
+        </div>
+      </div>
+
+      <!-- ===== RIGHT: proof of insurance + AI assist ===== -->
+      <div class="col-4">
+
+        <!-- Proof of insurance / ID card -->
+        <div class="card" style="margin-bottom:18px;">
+          <div class="card-head"><div class="card-title">Proof of insurance</div></div>
+          <div class="id-card" id="mini-id" role="button" tabindex="0" aria-label="Open digital ID card">
+            <div class="id-glow"></div>
+            <div class="id-head">
+              <div>
+                <div class="id-brand">Self-Insure</div>
+                <div class="id-sub">Proof of Insurance</div>
+              </div>
+              <div class="id-qr" id="mini-qr"></div>
+            </div>
+            <div class="id-row">
+              <div><div class="id-k">Member</div><div class="id-v" id="id-member">Eleanor Marsh</div></div>
+              <div><div class="id-k">Policy</div><div class="id-v" id="id-policy">SI-OH-204871</div></div>
+            </div>
+            <div class="id-row">
+              <div><div class="id-k">Form</div><div class="id-v" id="id-form">HO-3 Homeowners</div></div>
+              <div><div class="id-k">Term</div><div class="id-v" id="id-term">Jan 1, 2026 – Jan 1, 2027</div></div>
+            </div>
+          </div>
+          <p class="tiny muted" style="margin:14px 0 12px;line-height:1.55;">Your digital ID card is accepted as proof of insurance. Tap the card to open, add to your wallet, or download.</p>
+          <button class="btn btn-primary btn-sm btn-block" id="open-id-2">Open ID card</button>
+        </div>
+
+        <!-- AI assist -->
+        <div class="card card-ai ai-assist">
+          <span class="aa-ico">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l1.6 4.6L18 9l-4.4 1.4L12 15l-1.6-4.6L6 9l4.4-1.4z"/><path d="M19 14l.8 2.2L22 17l-2.2.8L19 20l-.8-2.2L16 17l2.2-.8z"/></svg>
+          </span>
+          <div class="card-title" style="margin-bottom:6px;">Ask the assistant to explain any document</div>
+          <p class="tiny muted" style="line-height:1.55;">Not sure what your declarations page means, or what's in the ROP addendum? Your assistant knows this policy line by line.</p>
+          <div class="aa-chips">
+            <button class="chip chip-ai" data-ask="What's in my declarations page?">What's in my declarations page?</button>
+            <button class="chip chip-ai" data-ask="Explain my Return-of-Premium addendum.">Explain my ROP addendum</button>
+            <button class="chip chip-ai" data-ask="Where are my documents?">Where are all my documents?</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+  <script src="account.js"></script>
+  <script src="intents.js"></script>
+  <script src="app.js"></script>
+  <script>
+    document.addEventListener("selfinsure:ready", function () {
+      var A = SI.account, fmt = SI.fmt, icon = SI.icon;
+      var P = A.policy, D = A.deductibles, R = A.rop, B = A.billing;
+
+      /* ---------- HEADER STRIP ---------- */
+      document.getElementById("dh-policy").textContent = P.number;
+      // Paperless chip reflects the live session state (settings/billing can toggle it).
+      var paperless = SI.state.get().paperless;
+      var paperEl = document.getElementById("dh-paperless");
+      if (!paperless) {
+        paperEl.className = "pill pill-warning";
+        paperEl.innerHTML = '<span class="dot"></span>Paperless is off';
+      }
+
+      /* ---------- TERM STRING (shared) ---------- */
+      var termStr =
+        fmt.dateShort(P.termStart) + ", " + P.termStart.slice(0, 4) + " – " +
+        fmt.dateShort(P.termEnd) + ", " + P.termEnd.slice(0, 4);
+
+      /* =====================================================================
+         BUILD THE DOCUMENT MODEL — read entirely from account.js.
+         Three sections: Policy, Billing statements, Tax & year-end.
+         Each item: { id, name, type, size, date, group, primary?, kind }
+         kind drives the facsimile body + plain-text export.
+         ================================================================== */
+
+      // 1) Policy documents — the canonical Policy-category docs (Declarations,
+      //    Policy contract, ROP addendum) + the Digital ID card (proof).
+      var policyDocs = A.documents
+        .filter(function (d) { return d.category === "Policy"; })
+        .map(function (d) {
+          return { id: d.id, name: d.name, type: d.type, size: d.size, date: d.date,
+                   group: "Policy", primary: !!d.primary,
+                   kind: d.id === "DOC-DEC" ? "dec" : d.id === "DOC-ROP" ? "rop" : "contract" };
+        });
+      var idDoc = A.documents.find(function (d) { return d.isIdCard; });
+      if (idDoc) {
+        policyDocs.push({ id: idDoc.id, name: idDoc.name, type: idDoc.type, size: idDoc.size,
+                          date: idDoc.date, group: "Proof", primary: false, kind: "id" });
+      }
+
+      // 2) Billing statements — generated from the last 6 monthly premium payments
+      //    ($125 each). Each is a viewable / downloadable statement.
+      var MONTHS_LONG = ["January","February","March","April","May","June","July","August","September","October","November","December"];
+      var billingDocs = B.history.map(function (p, i) {
+        var d = p.date.split("-");                       // YYYY-MM-DD
+        var monthName = MONTHS_LONG[parseInt(d[1], 10) - 1];
+        return {
+          id: "DOC-STM-" + p.id.replace("PMT-", ""),
+          name: monthName + " " + d[0] + " statement",
+          type: "PDF", size: (58 + i) + " KB", date: p.date,
+          group: "Billing", primary: false, kind: "statement",
+          // statement-specific facts (all from billing data):
+          payment: p, monthName: monthName, year: d[0]
+        };
+      });
+
+      // 3) Tax & year-end — a single year-end summary for the most recent full year.
+      var yearEndYear = parseInt(B.history[0].date.slice(0, 4), 10); // 2026
+      var taxDocs = [{
+        id: "DOC-YE-" + yearEndYear, name: yearEndYear + " year-end summary",
+        type: "PDF", size: "124 KB", date: yearEndYear + "-12-31",
+        group: "Tax", primary: false, kind: "yearend", year: yearEndYear
+      }];
+
+      // A flat lookup so the viewer/download handlers can resolve any id.
+      var ALL = policyDocs.concat(billingDocs, taxDocs);
+      function docById(id) { return ALL.find(function (d) { return d.id === id; }); }
+
+      /* ---------- ROW + GROUP RENDER ---------- */
+      function rowHTML(d) {
+        var primaryPill = d.primary
+          ? ' <span class="pill pill-ai" style="margin-left:2px;"><span class="dot"></span>Primary</span>' : '';
+        // ID card is opened via the ID flow rather than the facsimile viewer.
+        var viewLabel = d.kind === "id" ? "Open" : "View";
+        return '<div class="doc-row" data-doc="' + d.id + '" ' +
+            'data-name="' + d.name.toLowerCase() + '" data-type="' + d.type.toLowerCase() + '" data-group="' + d.group + '">' +
+          '<span class="file-glyph">' + (d.kind === "id" ? icon("wallet") : icon("doc")) + '</span>' +
+          '<div class="dr-body">' +
+            '<div class="dr-name">' + d.name + primaryPill + '</div>' +
+            '<div class="dr-meta">' + d.type + ' · ' + d.size + ' · ' + fmt.date(d.date) + '</div>' +
+          '</div>' +
+          '<div class="dr-actions">' +
+            '<span class="type-tag">' + d.type + '</span>' +
+            '<button class="btn btn-ghost btn-sm" data-view>' + viewLabel + '</button>' +
+            '<button class="icon-btn" data-dl aria-label="Download ' + d.name + '">' + icon("download") + '</button>' +
+          '</div>' +
+        '</div>';
+      }
+
+      // Render each section's list. The Policy section also holds the ID card row
+      // (its data-group is "Proof"), so the Proof filter chip reveals it in place.
+      var LISTS = { Policy: policyDocs, Billing: billingDocs, Tax: taxDocs };
+      Object.keys(LISTS).forEach(function (g) {
+        var host = document.querySelector('[data-list="' + g + '"]');
+        if (host) host.innerHTML = LISTS[g].map(rowHTML).join("");
+      });
+
+      /* ---------- WIRE EACH ROW ---------- */
+      document.querySelectorAll(".doc-row").forEach(function (rowEl) {
+        var d = docById(rowEl.getAttribute("data-doc"));
+        rowEl.querySelector("[data-view]").addEventListener("click", function () {
+          if (d.kind === "id") { SI.flows.idCard(); return; }
+          openDocViewer(d);
+        });
+        rowEl.querySelector("[data-dl]").addEventListener("click", function () {
+          if (d.kind === "id") {
+            SI.flows.downloadText("self-insure-id-card.txt", idCardText());
+            SI.ui.toast("Preparing your download…", "ai", { title: "Digital ID card" });
+            setTimeout(function () { SI.ui.toast("Downloaded " + d.name + "."); }, 650);
+            return;
+          }
+          SI.ui.toast("Preparing your download…", "ai", { title: d.name });
+          setTimeout(function () {
+            SI.flows.downloadText(slug(d.name) + ".txt", docPlainText(d));
+            SI.ui.toast("Downloaded " + d.name + ".");
+          }, 650);
+        });
+      });
+
+      /* ---------- GROUP COUNTS ---------- */
+      function refreshCounts() {
+        document.querySelectorAll(".doc-group").forEach(function (sec) {
+          var rows = sec.querySelectorAll(".doc-row");
+          var visible = sec.querySelectorAll(".doc-row:not(.is-hidden)").length;
+          var countEl = sec.querySelector("[data-group-count]");
+          if (countEl) countEl.textContent = visible + " of " + rows.length;
+          sec.classList.toggle("is-empty", visible === 0);
+        });
+      }
+
+      /* =====================================================================
+         CLIENT-SIDE SEARCH + TYPE FILTER
+         - search box matches document name OR type
+         - type chips: All / Policy / Billing / Tax / Proof (group/category)
+         ================================================================== */
+      var searchWrap = document.getElementById("doc-search");
+      var searchInput = document.getElementById("doc-search-input");
+      var searchClear = document.getElementById("doc-search-clear");
+      var emptyEl = document.getElementById("doc-empty");
+      var emptyQ = document.getElementById("empty-q");
+      var filterBtns = Array.prototype.slice.call(document.querySelectorAll("#doc-filters .chip"));
+      var activeFilter = "all";
+
+      function applyFilter() {
+        var q = searchInput.value.trim().toLowerCase();
+        searchWrap.classList.toggle("has-value", q.length > 0);
+        var anyVisible = false;
+        document.querySelectorAll(".doc-row").forEach(function (row) {
+          var name = row.getAttribute("data-name");
+          var type = row.getAttribute("data-type");
+          var group = row.getAttribute("data-group");
+          var matchesText = !q || name.indexOf(q) > -1 || type.indexOf(q) > -1;
+          var matchesFilter = activeFilter === "all" || group === activeFilter;
+          var show = matchesText && matchesFilter;
+          row.classList.toggle("is-hidden", !show);
+          if (show) anyVisible = true;
+        });
+        refreshCounts();
+        emptyQ.textContent = q || (activeFilter === "all" ? "" : activeFilter);
+        emptyEl.classList.toggle("show", !anyVisible);
+      }
+
+      searchInput.addEventListener("input", applyFilter);
+      searchClear.addEventListener("click", function () {
+        searchInput.value = ""; searchInput.focus(); applyFilter();
+      });
+      document.getElementById("empty-reset").addEventListener("click", function () {
+        searchInput.value = ""; setFilter("all"); searchInput.focus();
+      });
+      function setFilter(f) {
+        activeFilter = f;
+        filterBtns.forEach(function (b) {
+          var on = b.getAttribute("data-filter") === f;
+          b.setAttribute("aria-pressed", on ? "true" : "false");
+        });
+        applyFilter();
+      }
+      filterBtns.forEach(function (b) {
+        b.addEventListener("click", function () { setFilter(b.getAttribute("data-filter")); });
+      });
+      refreshCounts();
+
+      /* =====================================================================
+         DOWNLOAD: plain-text export per document kind (genuine Blob download)
+         ================================================================== */
+      function slug(s) { return s.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, ""); }
+
+      function header(lines) {
+        lines.push("SELF-INSURE", "the insurance that gives it back", "",
+          "Policy: " + P.number, "Member: " + A.member.fullName, "Form: " + P.form,
+          "Term: " + fmt.date(P.termStart) + " – " + fmt.date(P.termEnd),
+          "Property: " + P.propertyAddress.line1 + ", " + P.propertyAddress.city + ", " + P.propertyAddress.state + " " + P.propertyAddress.zip, "");
+        return lines;
+      }
+      function idCardText() {
+        return ["SELF-INSURE — PROOF OF INSURANCE", "",
+          "Member: " + A.member.fullName, "Policy: " + P.number, "Form: " + P.product,
+          "Term: " + fmt.date(P.termStart) + " – " + fmt.date(P.termEnd),
+          "Property: " + P.propertyAddress.line1 + ", " + P.propertyAddress.city + ", " + P.propertyAddress.state + " " + P.propertyAddress.zip,
+          "Status: ACTIVE", ""].join("\n");
+      }
+      function docPlainText(d) {
+        var lines = header([]);
+        if (d.kind === "dec") {
+          lines.push(d.name.toUpperCase(), "", "COVERAGES");
+          A.coverages.forEach(function (c) { lines.push("  " + c.code + "  " + c.name + ": " + fmt.currency0(c.amount)); });
+          lines.push("", "DEDUCTIBLES", "  All-perils: " + D.allPerils.label, "  Windstorm: " + D.windHail.label,
+            "", "PREMIUM", "  Annual: " + fmt.currency0(B.premiumAnnual) + " (" + fmt.currency0(B.premiumMonthly) + "/mo)");
+        } else if (d.kind === "rop") {
+          lines.push("RETURN-OF-PREMIUM ADDENDUM", "");
+          R.tiers.forEach(function (t) { lines.push("  " + t.name + " — " + t.pct + "% back · " + t.termYears + "yr · up to " + fmt.currency0(t.returnAmount)); });
+          lines.push("", "Enrolled tier: Bronze (50%)",
+            "Status: Year " + R.policyYear + " of " + R.enrolledTermYears + " · claims-free · on track for " + fmt.currency0(R.bronzeReturnAmount));
+        } else if (d.kind === "statement") {
+          var p = d.payment;
+          lines.push("BILLING STATEMENT — " + d.monthName.toUpperCase() + " " + d.year, "",
+            "Statement no: " + d.id,
+            "Charge date: " + fmt.date(p.date),
+            "Description: Monthly premium",
+            "Amount: " + fmt.currency0(p.amount),
+            "Method: " + p.method,
+            "Status: " + p.status,
+            "", "Balance after payment: " + fmt.currency0(B.balance) + " (up to date)");
+        } else if (d.kind === "yearend") {
+          var paid = B.history.reduce(function (s, p) { return s + p.amount; }, 0);
+          lines.push(d.year + " YEAR-END SUMMARY", "",
+            "Premium billed this year: " + fmt.currency0(paid) + " (" + B.history.length + " payments of " + fmt.currency0(B.premiumMonthly) + ")",
+            "Premium paid to date (since " + A.member.memberSinceYear + "): " + fmt.currency0(B.paidToDate),
+            "Return of Premium reserved (Bronze): " + fmt.currency0(R.bronzeReturnAmount) + " at year " + R.enrolledTermYears,
+            "Outstanding balance: " + fmt.currency0(B.balance),
+            "", "Note: Homeowners insurance premiums on a primary residence are generally",
+            "not tax-deductible. This summary is provided for your records.");
+        } else if (d.kind === "contract") {
+          lines.push("HO-3 (SPECIAL FORM) POLICY CONTRACT", "",
+            "This facsimile is generated for demonstration from your live account data.");
+        }
+        lines.push("", "Status: ACTIVE", "Document ID: " + d.id);
+        return lines.join("\n");
+      }
+
+      /* =====================================================================
+         VIEW: the facsimile document viewer modal (reuses policy.html pattern).
+         ================================================================== */
+      function openDocViewer(d) {
+        var bodyInner;
+        if (d.kind === "dec") {
+          bodyInner =
+            '<h4>Named insured &amp; policy</h4>' +
+            '<dl class="fx-kv">' +
+              '<dt>Named insured</dt><dd>' + A.member.fullName + '</dd>' +
+              '<dt>Policy number</dt><dd>' + P.number + '</dd>' +
+              '<dt>Form</dt><dd>' + P.form + '</dd>' +
+              '<dt>Policy period</dt><dd>' + fmt.date(P.termStart) + ' – ' + fmt.date(P.termEnd) + '</dd>' +
+              '<dt>Insured property</dt><dd>' + P.propertyAddress.line1 + ', ' + P.propertyAddress.city + ', ' + P.propertyAddress.state + ' ' + P.propertyAddress.zip + '</dd>' +
+            '</dl>' +
+            '<h4>Coverages &amp; limits</h4>' +
+            '<table class="fx-tbl"><thead><tr><th>Code</th><th>Coverage</th><th style="text-align:right;">Limit</th></tr></thead><tbody>' +
+            A.coverages.map(function (c) { return '<tr><td>' + c.code + '</td><td>' + c.name + '</td><td class="num">' + fmt.currency0(c.amount) + '</td></tr>'; }).join("") +
+            '</tbody></table>' +
+            '<h4>Deductibles</h4>' +
+            '<dl class="fx-kv"><dt>All perils</dt><dd>' + D.allPerils.label + '</dd>' +
+            '<dt>Windstorm</dt><dd>' + D.windHail.label + '</dd></dl>' +
+            '<h4>Premium</h4>' +
+            '<dl class="fx-kv"><dt>Annual premium</dt><dd>' + fmt.currency0(B.premiumAnnual) + '</dd>' +
+            '<dt>Billed</dt><dd>' + fmt.currency0(B.premiumMonthly) + ' / month · autopay</dd></dl>';
+        } else if (d.kind === "rop") {
+          bodyInner =
+            '<h4>Return-of-Premium addendum</h4>' +
+            '<p style="font-size:12.5px;color:#5b5b57;margin:0 0 12px;line-height:1.55;">Stay claims-free through your term and a share of the premiums you paid is returned to you. This addendum forms part of policy ' + P.number + '.</p>' +
+            '<table class="fx-tbl"><thead><tr><th>Tier</th><th>Term</th><th>Back</th><th style="text-align:right;">Up to</th></tr></thead><tbody>' +
+            R.tiers.map(function (t) { return '<tr><td>' + t.name + (t.current ? ' (enrolled)' : '') + '</td><td>' + t.termYears + ' yr</td><td>' + t.pct + '%</td><td class="num">' + fmt.currency0(t.returnAmount) + '</td></tr>'; }).join("") +
+            '</tbody></table>' +
+            '<h4>Your status</h4>' +
+            '<dl class="fx-kv"><dt>Enrolled tier</dt><dd>Bronze · 50%</dd>' +
+            '<dt>Policy year</dt><dd>' + R.policyYear + ' of ' + R.enrolledTermYears + '</dd>' +
+            '<dt>Standing</dt><dd>Claims-free · on track</dd>' +
+            '<dt>Projected return</dt><dd>' + fmt.currency0(R.bronzeReturnAmount) + ' at year ' + R.enrolledTermYears + ' (' + fmt.date(R.bronzeReturnDate) + ')</dd></dl>';
+        } else if (d.kind === "statement") {
+          var p = d.payment;
+          bodyInner =
+            '<h4>Statement summary</h4>' +
+            '<dl class="fx-kv">' +
+              '<dt>Statement no.</dt><dd>' + d.id + '</dd>' +
+              '<dt>Billing month</dt><dd>' + d.monthName + ' ' + d.year + '</dd>' +
+              '<dt>Charge date</dt><dd>' + fmt.date(p.date) + '</dd>' +
+            '</dl>' +
+            '<h4>Charges</h4>' +
+            '<table class="fx-tbl"><thead><tr><th>Description</th><th>Method</th><th style="text-align:right;">Amount</th></tr></thead><tbody>' +
+              '<tr><td>Monthly premium</td><td>' + p.method + '</td><td class="num">' + fmt.currency0(p.amount) + '</td></tr>' +
+              '<tr><td><strong>Total ' + p.status.toLowerCase() + '</strong></td><td></td><td class="num">' + fmt.currency0(p.amount) + '</td></tr>' +
+            '</tbody></table>' +
+            '<h4>Account</h4>' +
+            '<dl class="fx-kv"><dt>Status</dt><dd>' + p.status + ' · autopay</dd>' +
+            '<dt>Balance after</dt><dd>' + fmt.currency0(B.balance) + ' — up to date</dd></dl>';
+        } else if (d.kind === "yearend") {
+          var paid = B.history.reduce(function (s, q) { return s + q.amount; }, 0);
+          bodyInner =
+            '<h4>' + d.year + ' year-end summary</h4>' +
+            '<p style="font-size:12.5px;color:#5b5b57;margin:0 0 12px;line-height:1.55;">A record of premium billed and paid on policy ' + P.number + ' during ' + d.year + ', and your Return-of-Premium standing.</p>' +
+            '<table class="fx-tbl"><thead><tr><th>Item</th><th style="text-align:right;">Amount</th></tr></thead><tbody>' +
+              '<tr><td>Premium billed in ' + d.year + ' (' + B.history.length + ' × ' + fmt.currency0(B.premiumMonthly) + ')</td><td class="num">' + fmt.currency0(paid) + '</td></tr>' +
+              '<tr><td>Premium paid to date (since ' + A.member.memberSinceYear + ')</td><td class="num">' + fmt.currency0(B.paidToDate) + '</td></tr>' +
+              '<tr><td>Return of Premium reserved (Bronze)</td><td class="num">' + fmt.currency0(R.bronzeReturnAmount) + '</td></tr>' +
+              '<tr><td>Outstanding balance</td><td class="num">' + fmt.currency0(B.balance) + '</td></tr>' +
+            '</tbody></table>' +
+            '<p style="font-size:11.5px;color:#8a8a85;margin-top:14px;line-height:1.5;">Homeowners insurance premiums on a primary residence are generally not tax-deductible. This summary is provided for your records.</p>';
+        } else {
+          bodyInner =
+            '<h4>HO-3 homeowners policy contract</h4>' +
+            '<p style="font-size:12.5px;color:#5b5b57;margin:0 0 12px;line-height:1.6;">This Special Form contract sets out the agreement between ' + A.member.fullName + ' and Self-Insure for policy ' + P.number + '. It covers your dwelling and other structures against all risks of direct physical loss except those specifically excluded, and your personal property against named perils.</p>' +
+            '<dl class="fx-kv">' +
+              '<dt>Section I</dt><dd>Property coverages A–D</dd>' +
+              '<dt>Section II</dt><dd>Liability coverages E–F</dd>' +
+              '<dt>Conditions</dt><dd>Duties after loss, appraisal, our option</dd>' +
+              '<dt>Endorsements</dt><dd>Return-of-Premium addendum (Bronze)</dd>' +
+            '</dl>' +
+            '<p style="font-size:11.5px;color:#8a8a85;margin-top:14px;">Full contract language continues across 24 pages. This facsimile renders the cover sheet for demonstration.</p>';
+        }
+
+        var node = document.createElement("div");
+        node.innerHTML =
+          '<div class="modal-head"><div class="modal-title">' + d.name + '</div>' +
+          '<button class="modal-close" data-close aria-label="Close">' + icon("x") + '</button></div>' +
+          '<div class="modal-body" style="background:var(--surface-2);">' +
+            '<div class="facsimile">' +
+              '<div class="fx-head"><div><div class="fx-brand">Self-Insure</div><div class="fx-tag">the insurance that gives it back</div></div>' +
+              '<div><div class="fx-doctype">' + d.name + '</div><div class="fx-sub">' + d.type + ' · ' + fmt.date(d.date) + '</div></div></div>' +
+              bodyInner +
+              '<span class="fx-stamp">Active · ' + P.number + '</span>' +
+              '<div class="fx-foot">This page is a demonstration facsimile generated from live account data. It is not a legal document. Self-Insure · Ohio &amp; Wisconsin · Document ' + d.id + '.</div>' +
+            '</div>' +
+          '</div>' +
+          '<div class="modal-foot"><button class="btn btn-ghost" data-close>Close</button>' +
+          '<button class="btn btn-ai-ghost" data-ask-doc>' + icon("spark") + 'Explain this</button>' +
+          '<button class="btn btn-primary" data-dl>' + icon("download") + 'Download</button></div>';
+        var m = SI.ui.openModal(node, { wide: true });
+        m.querySelector("[data-dl]").addEventListener("click", function () {
+          SI.ui.toast("Preparing your download…", "ai", { title: d.name });
+          setTimeout(function () {
+            SI.flows.downloadText(slug(d.name) + ".txt", docPlainText(d));
+            SI.ui.toast("Downloaded " + d.name + ".");
+          }, 650);
+        });
+        m.querySelector("[data-ask-doc]").addEventListener("click", function () {
+          SI.ui.closeModal();
+          SI.assistant.send("Can you explain my " + d.name + "?");
+        });
+      }
+
+      /* =====================================================================
+         INLINE ID CARD (mini, in the right rail)
+         ================================================================== */
+      document.getElementById("id-member").textContent = A.member.fullName;
+      document.getElementById("id-policy").textContent = P.number;
+      document.getElementById("id-form").textContent = P.product;
+      document.getElementById("id-term").textContent = termStr;
+      (function () {
+        var ink = SI.charts.cssVar("--qr-ink") || "#0c0d10";
+        var cells = "";
+        for (var y = 0; y < 7; y++) for (var x = 0; x < 7; x++) {
+          var on = ((x * 13 + y * 7 + x * y) % 3 === 0) || (x < 2 && y < 2) || (x > 4 && y < 2) || (x < 2 && y > 4);
+          if (on) cells += '<rect x="' + (x * 8) + '" y="' + (y * 8) + '" width="8" height="8" fill="' + ink + '"/>';
+        }
+        document.getElementById("mini-qr").innerHTML = '<svg viewBox="0 0 56 56" width="100%" height="100%">' + cells + '</svg>';
+      })();
+      var miniId = document.getElementById("mini-id");
+      miniId.addEventListener("click", function () { SI.flows.idCard(); });
+      miniId.addEventListener("keydown", function (e) { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); SI.flows.idCard(); } });
+      document.getElementById("open-id-2").addEventListener("click", function () { SI.flows.idCard(); });
+      document.getElementById("btn-id-card").addEventListener("click", function () { SI.flows.idCard(); });
+
+      /* ---------- ASSISTANT CHIPS (data-ask) ---------- */
+      document.querySelectorAll("[data-ask]").forEach(function (b) {
+        b.addEventListener("click", function () { SI.assistant.send(b.getAttribute("data-ask")); });
+      });
+
+      /* ---------- KEEP PAPERLESS CHIP IN SYNC IF TOGGLED ELSEWHERE ---------- */
+      window.addEventListener("selfinsure:state", function (e) {
+        if (e.detail && e.detail.path === "paperless") {
+          var on = e.detail.value;
+          paperEl.className = on ? "pill pill-ai" : "pill pill-warning";
+          paperEl.innerHTML = '<span class="dot"></span>' + (on ? "Paperless is on" : "Paperless is off");
+        }
+      });
+    });
+  </script>
+</body>
+</html>
