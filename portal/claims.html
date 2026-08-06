@@ -1,0 +1,887 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Claims · Self-Insure</title>
+  <script src="theme.js"></script>
+  <link rel="stylesheet" href="styles.css" />
+  <!-- screen-scoped tweaks only; everything else comes from styles.css tokens/components -->
+  <style>
+    /* --- payout math card --- */
+    /* No overflow:hidden — the .pm-op operator badges sit on the cell edge and would be
+       sliced if a flex-wrapped row clipped them. On narrow viewports the row stays a
+       single horizontal scroll strip so the three cells never wrap and every badge keeps
+       sitting on an interior divider. */
+    .payout-math { display: flex; align-items: stretch; flex-wrap: wrap; gap: 0; background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--r-card); }
+    .pm-cell { flex: 1 1 0; min-width: 120px; padding: 16px 18px; display: flex; flex-direction: column; justify-content: center; gap: 3px; position: relative; }
+    .pm-cell:first-child { border-top-left-radius: var(--r-card); border-bottom-left-radius: var(--r-card); }
+    .pm-cell:last-child { border-top-right-radius: var(--r-card); border-bottom-right-radius: var(--r-card); }
+    .pm-cell + .pm-cell::before { content: ""; position: absolute; left: 0; top: 14px; bottom: 14px; width: 1px; background: var(--border); }
+    .pm-op { position: absolute; left: -9px; top: 50%; transform: translateY(-50%); width: 18px; height: 18px; border-radius: 50%; background: var(--surface); border: 1px solid var(--border); display: grid; place-items: center; font-size: 12px; font-weight: 700; color: var(--text-2); z-index: 2; }
+    @media (max-width: 560px) {
+      .payout-math { flex-wrap: nowrap; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+      .pm-cell { flex: 1 0 auto; }
+    }
+    .pm-k { font-size: 11.5px; color: var(--text-2); }
+    .pm-v { font-family: var(--font-display); font-size: 24px; font-weight: 500; color: var(--text); font-variant-numeric: tabular-nums; line-height: 1.05; }
+    .pm-cell.net { background: var(--ai-tint); }
+    .pm-cell.net .pm-v { color: var(--ai); }
+
+    /* --- countdown chip --- */
+    .countdown-chip { display: inline-flex; align-items: center; gap: 7px; padding: 6px 12px; border-radius: var(--r-pill); background: var(--ai-tint); border: 1px solid var(--ai-border); color: var(--ai); font-size: 12.5px; font-weight: 600; }
+    .countdown-chip svg { width: 14px; height: 14px; }
+    .cd-num { font-variant-numeric: tabular-nums; }
+
+    /* --- AI summary panel --- */
+    .ai-summary { background: var(--ai-tint); border: 1px solid var(--ai-border); border-radius: var(--r-card); padding: 16px 18px; }
+    .ai-summary .ais-head { display: flex; align-items: center; gap: 9px; margin-bottom: 10px; }
+    .ai-summary .ais-spark { width: 28px; height: 28px; flex: 0 0 28px; border-radius: 8px; background: var(--ai); color: var(--ai-ink); display: grid; place-items: center; }
+    .ai-summary .ais-spark svg { width: 16px; height: 16px; }
+    .ais-rows { display: flex; flex-direction: column; gap: 7px; }
+    .ais-row { display: flex; align-items: flex-start; gap: 8px; font-size: 12.5px; color: var(--text); }
+    .ais-row svg { width: 14px; height: 14px; color: var(--ai); flex: 0 0 14px; margin-top: 2px; }
+
+    /* --- stepper detail under each node (data-driven, always visible on desktop) --- */
+    .claim-stepper { margin: 6px 0 4px; }
+
+    /* --- file-a-claim wizard --- */
+    .fc-grid { display: grid; grid-template-columns: 210px 1fr; gap: 26px; align-items: start; }
+    @media (max-width: 820px) { .fc-grid { grid-template-columns: 1fr; gap: 18px; } .fc-rail { display: none; } }
+    .fc-panel { min-height: 230px; }
+    .fc-step { animation: fcfade .28s var(--ease); }
+    @keyframes fcfade { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+    .fc-foot { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 22px; padding-top: 18px; border-top: 1px solid var(--border); }
+
+    /* peril / area option grid */
+    .opt-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+    @media (max-width: 560px) { .opt-grid { grid-template-columns: repeat(2, 1fr); } }
+    .opt {
+      display: flex; flex-direction: column; align-items: flex-start; gap: 8px;
+      padding: 13px 13px; border-radius: var(--r-ctrl); border: 1px solid var(--border);
+      background: var(--surface-2); cursor: pointer; text-align: left; transition: all .14s var(--ease); color: var(--text);
+    }
+    .opt:hover { border-color: var(--ai-border); }
+    .opt .opt-ic { width: 30px; height: 30px; border-radius: 8px; background: var(--surface); border: 1px solid var(--border); display: grid; place-items: center; color: var(--text-2); }
+    .opt .opt-ic svg { width: 16px; height: 16px; }
+    .opt .opt-name { font-size: 13px; font-weight: 600; }
+    .opt.sel { border-color: var(--ai); background: var(--ai-tint); }
+    .opt.sel .opt-ic { background: var(--ai); border-color: var(--ai); color: var(--ai-ink); }
+    .opt.sel .opt-name { color: var(--ai); }
+
+    .thumb .thumb-x { position: absolute; top: -6px; right: -6px; width: 20px; height: 20px; border-radius: 50%; background: var(--danger); color: var(--danger-ink); border: 2px solid var(--surface); display: grid; place-items: center; cursor: pointer; padding: 0; }
+    .thumb .thumb-x svg { width: 10px; height: 10px; margin: 0; }
+    .thumb.add-more { cursor: pointer; border-style: dashed; }
+    .thumb.add-more:hover { border-color: var(--ai); color: var(--ai); }
+
+    /* review summary rows */
+    .rev-rows { display: flex; flex-direction: column; }
+    .rev-row { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; padding: 11px 0; border-bottom: 1px solid var(--border-2); }
+    .rev-row:last-child { border-bottom: 0; }
+    .rev-k { font-size: 12.5px; color: var(--text-2); }
+    .rev-v { font-size: 13px; font-weight: 600; color: var(--text); text-align: right; }
+
+    /* AI triage stage (post-submit animation) */
+    .triage { text-align: center; padding: 8px 0 2px; }
+    .triage-orb { width: 86px; height: 86px; margin: 0 auto 18px; border-radius: 50%; background: var(--ai-tint); border: 1px solid var(--ai-border); display: grid; place-items: center; color: var(--ai); position: relative; }
+    .triage-orb svg { width: 34px; height: 34px; }
+    .triage-orb::before { content: ""; position: absolute; inset: -6px; border-radius: 50%; border: 2px solid var(--ai); border-top-color: transparent; border-right-color: transparent; animation: spin 1s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .triage-lines { max-width: 360px; margin: 0 auto; text-align: left; display: flex; flex-direction: column; gap: 9px; }
+    .triage-line { display: flex; align-items: center; gap: 9px; font-size: 13px; color: var(--text-3); opacity: .35; transition: opacity .3s, color .3s; }
+    .triage-line.on { opacity: 1; color: var(--text); }
+    .triage-line .tl-tick { width: 18px; height: 18px; flex: 0 0 18px; border-radius: 50%; border: 1.5px solid var(--border); display: grid; place-items: center; color: transparent; transition: all .3s; }
+    .triage-line.on .tl-tick { background: var(--ai); border-color: var(--ai); color: var(--ai-ink); }
+    .triage-line .tl-tick svg { width: 11px; height: 11px; }
+
+    /* result success state */
+    .result-check { width: 72px; height: 72px; margin: 0 auto 16px; border-radius: 50%; background: var(--ai); color: var(--ai-ink); display: grid; place-items: center; animation: pop .4s var(--ease); }
+    .result-check svg { width: 36px; height: 36px; }
+    @keyframes pop { 0% { transform: scale(.4); opacity: 0; } 60% { transform: scale(1.08); } 100% { transform: scale(1); opacity: 1; } }
+
+    /* small confidence meter inside triage result */
+    .conf-wrap { max-width: 300px; margin: 14px auto 0; }
+    .conf-row { display: flex; justify-content: space-between; font-size: 11.5px; color: var(--text-2); margin-bottom: 6px; }
+
+    @media (prefers-reduced-motion: reduce) {
+      .triage-orb::before, .fc-step { animation: none; }
+    }
+  </style>
+  <link rel="icon" type="image/svg+xml" href="favicon.svg">
+</head>
+<body>
+  <div data-content>
+
+    <!-- ============ HEADER ============ -->
+    <div class="section-head" style="margin-bottom:6px;">
+      <div>
+        <h2 class="display" style="font-size:28px;">Claims</h2>
+        <p class="muted" style="margin-top:2px;">File, track, and review claims on policy
+          <strong style="color:var(--text);" id="ch-pol">SI-OH-204871</strong>.</p>
+      </div>
+      <button class="btn btn-primary" id="start-claim-btn">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>
+        Start a new claim
+      </button>
+    </div>
+
+    <!-- ============ (A) FILE A CLAIM WIZARD (collapsed by default; #file opens it) ============ -->
+    <div class="card section" id="file" style="margin-bottom:22px; display:none;">
+      <div class="card-head">
+        <div class="card-title">
+          <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+          File a claim
+        </div>
+        <button class="btn btn-ghost btn-sm" id="fc-cancel-top">Cancel</button>
+      </div>
+
+      <div class="fc-grid">
+        <!-- left rail stepper -->
+        <aside class="fc-rail">
+          <div class="wizard-steps" id="fc-steps"></div>
+          <div class="card pad-sm" style="background:var(--surface-2);box-shadow:none;margin-top:16px;">
+            <div class="tiny muted" style="line-height:1.5;">
+              <strong style="color:var(--text);">Most claims are AI-assessed in under a minute.</strong>
+              Your <span class="num" style="font-size:12px;" id="rail-ded">$1,500</span> all-perils deductible applies.
+            </div>
+          </div>
+        </aside>
+
+        <!-- right panel -->
+        <div class="fc-panel" id="fc-panel"></div>
+      </div>
+    </div>
+
+    <!-- ============ (B) ACTIVE CLAIM TRACKER ============ -->
+    <div class="section" style="margin-bottom:10px;" id="active-section">
+      <div class="section-head">
+        <h3 class="section-title">Active claim</h3>
+        <span class="muted tiny" id="active-count">1 in progress</span>
+      </div>
+    </div>
+    <div id="active-claims" style="display:flex;flex-direction:column;gap:18px;margin-bottom:30px;"></div>
+
+    <!-- ============ (C) CLAIM HISTORY ============ -->
+    <div class="section">
+      <div class="section-head">
+        <h3 class="section-title">Claim history</h3>
+        <span class="pill"><span class="num" style="font-size:12px;" id="hist-count">1</span>&nbsp;total</span>
+      </div>
+      <div class="card flush">
+        <div class="table-wrap">
+          <table class="data" id="history-table">
+            <thead>
+              <tr>
+                <th>Claim #</th><th>Type</th><th>Filed</th><th>Status</th>
+                <th class="td-num">Net payout</th><th class="td-action">Detail</th>
+              </tr>
+            </thead>
+            <tbody id="history-body"></tbody>
+          </table>
+        </div>
+        <div style="padding:13px 16px;border-top:1px solid var(--border-2);" class="tiny muted-3" id="hist-footnote">
+          Your first claim in six years was CLM-31182 (filed today). Claims-free from 2020 to early 2026.
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+  <script src="account.js"></script>
+  <script src="intents.js"></script>
+  <script src="app.js"></script>
+  <script>
+  document.addEventListener("selfinsure:ready", function () {
+    var A = SI.account, fmt = SI.fmt, icon = SI.icon;
+
+    document.getElementById("ch-pol").textContent = A.policy.number;
+    // rail tip deductible reads from the canonical model (never hard-code formatted money)
+    document.getElementById("rail-ded").textContent = fmt.currency0(A.deductibles.allPerils.amount);
+
+    /* =====================================================================
+       PERIL + AREA CATALOG (icons map to SI.icon names)
+       ===================================================================== */
+    var PERILS = [
+      { key: "windhail", name: "Wind / Hail",  icon: "home",  windHail: true },
+      { key: "water",    name: "Water",        icon: "info" },
+      { key: "fire",     name: "Fire / Smoke", icon: "alert" },
+      { key: "theft",    name: "Theft",        icon: "shield" },
+      { key: "liability",name: "Liability",    icon: "user" },
+      { key: "other",    name: "Other",        icon: "doc" }
+    ];
+    var AREAS = [
+      { key: "roof",     name: "Roof",            icon: "home" },
+      { key: "interior", name: "Interior",        icon: "grid" },
+      { key: "exterior", name: "Exterior",        icon: "shield" },
+      { key: "contents", name: "Personal property", icon: "card" }
+    ];
+    var SEVERITY = ["Minor", "Moderate", "Severe"];
+    // rough gross estimate seeds by severity so the AI decision feels grounded
+    var SEV_GROSS = { Minor: 4200, Moderate: 9600, Severe: 18500 };
+
+    /* =====================================================================
+       (B) ACTIVE CLAIM TRACKER — render all active (canonical + session) claims
+       ===================================================================== */
+    function isActive(c) {
+      return ["Submitted", "AI review", "Approved", "Referred"].indexOf(c.status) > -1;
+    }
+    function statusPill(status) {
+      if (status === "Approved" || status === "Paid")
+        return '<span class="pill pill-ai"><span class="dot"></span>' + status + '</span>';
+      if (status === "Submitted" || status === "AI review")
+        return '<span class="pill pill-warning"><span class="dot"></span>' + status + '</span>';
+      if (status === "Referred")
+        return '<span class="pill pill-info">' + status + '</span>';
+      if (status === "Denied")
+        return '<span class="pill pill-danger">' + status + '</span>';
+      return '<span class="pill">' + status + '</span>';
+    }
+
+    function trackerCardHTML(c) {
+      var stage = c.statusStage || 1;
+      var steps = (c.timeline || []).map(function (t) {
+        var cls = t.stage < stage ? "done" : t.stage === stage ? (c.status === "Approved" || c.status === "Paid" ? "done" : "current") : "";
+        return '<div class="step ' + cls + '">' +
+          '<span class="node">' + (cls === "done" ? icon("check") : '') + '</span>' +
+          '<span class="step-label">' + t.label + '</span>' +
+          '<span class="step-time">' + t.time + '</span>' +
+          '<span class="step-detail">' + t.detail + '</span></div>';
+      }).join("");
+
+      var approved = (c.status === "Approved" || c.status === "Paid");
+      var payout = approved ? (
+        '<div class="payout-math" style="margin-top:18px;">' +
+          '<div class="pm-cell"><span class="pm-k">Assessed damage</span><span class="pm-v">' + fmt.currency0(c.grossAmount) + '</span></div>' +
+          '<div class="pm-cell"><span class="pm-op">−</span><span class="pm-k">Deductible</span><span class="pm-v">' + fmt.currency0(c.deductibleApplied) + '</span></div>' +
+          '<div class="pm-cell net"><span class="pm-op">=</span><span class="pm-k">Net payout · ' + c.fundsTiming + '</span><span class="pm-v">' + fmt.currency0(c.netPayout) + '</span></div>' +
+        '</div>') : '';
+
+      // assessment-time copy is data-driven: canonical CLM-31182 carries assessSeconds (38),
+      // session-filed claims omit it and read "analyzed in seconds" — matching their own timeline.
+      var analyzedCopy = c.assessSeconds
+        ? 'Imagery + policy data analyzed in ' + c.assessSeconds + ' seconds.'
+        : 'Imagery + policy data analyzed in seconds.';
+      var aiSummary = c.aiAssessed ? (
+        '<div class="ai-summary" style="margin-top:18px;">' +
+          '<div class="ais-head"><span class="ais-spark">' + icon("spark") + '</span>' +
+            '<div><div style="font-weight:600;font-size:13px;">AI assessment summary</div>' +
+            '<div class="tiny muted">Model confidence ' + Math.round((c.decisionConfidence || .97) * 100) + '%</div></div></div>' +
+          '<div class="ais-rows">' +
+            '<div class="ais-row">' + icon("check") + analyzedCopy + '</div>' +
+            '<div class="ais-row">' + icon("check") + (c.peril || "Hail") + ' confirmed as a covered peril under your HO-3.</div>' +
+            '<div class="ais-row">' + icon("check") + 'Your ' + fmt.currency0(c.deductibleApplied) + ' all-perils deductible applied — payout of ' + fmt.currency0(c.netPayout) + '.</div>' +
+          '</div></div>') : '';
+
+      return '<div class="card card-ai" data-claim="' + c.id + '">' +
+        '<div class="card-head" style="align-items:center;">' +
+          '<div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">' +
+            '<div class="card-title" style="font-size:15px;">' + c.title + '</div>' +
+            statusPill(c.status) +
+          '</div>' +
+          '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">' +
+            (approved ? '<span class="countdown-chip">' + icon("clock") + 'Funds arriving <span class="cd-num" data-countdown>today</span></span>' : '') +
+            '<span class="muted tiny nowrap">' + c.id + ' · ' + (c.filedDisplay || fmt.relTime(c.filedDate, c.filedTime)) + '</span>' +
+          '</div>' +
+        '</div>' +
+        '<div class="claim-stepper"><div class="stepper">' + steps + '</div></div>' +
+        payout +
+        aiSummary +
+        '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:18px;">' +
+          '<button class="btn btn-ghost btn-sm" data-dl-summary="' + c.id + '">' + icon("download") + 'Download claim summary</button>' +
+          // "Ask about this claim" only on the canonical claim the assistant truly has a script for;
+          // session-filed claims would otherwise get CLM-31182's answer — a visible contradiction.
+          (c.id === A.claims[0].id
+            ? '<button class="btn btn-ai-ghost btn-sm" data-ask-claim="' + c.id + '">' + icon("spark") + 'Ask about this claim</button>'
+            : '') +
+          '<button class="btn btn-ghost btn-sm" data-talk-person="' + c.id + '">' + icon("phone") + 'Talk to a person</button>' +
+        '</div>' +
+      '</div>';
+    }
+
+    function renderActive() {
+      var active = SI.allClaims().filter(isActive);
+      var wrap = document.getElementById("active-claims");
+      var sectionHead = document.getElementById("active-section");
+      if (!active.length) {
+        sectionHead.style.display = "none";
+        wrap.innerHTML = '';
+        return;
+      }
+      sectionHead.style.display = "";
+      document.getElementById("active-count").textContent = active.length + " in progress";
+      wrap.innerHTML = active.map(trackerCardHTML).join("");
+
+      // animate steppers in (width fill is CSS; here we just trigger the "current" pulse already styled)
+      wireTrackerButtons(wrap);
+    }
+
+    function wireTrackerButtons(scope) {
+      scope.querySelectorAll("[data-dl-summary]").forEach(function (b) {
+        b.addEventListener("click", function () {
+          var id = b.getAttribute("data-dl-summary");
+          var c = SI.allClaims().filter(function (x) { return x.id === id; })[0];
+          SI.flows.downloadText(id + "-summary.txt", claimSummaryText(c));
+          SI.ui.toast("Downloaded " + id + " summary.", "ai", { title: "Claim summary" });
+        });
+      });
+      scope.querySelectorAll("[data-ask-claim]").forEach(function (b) {
+        b.addEventListener("click", function () {
+          var id = b.getAttribute("data-ask-claim");
+          SI.assistant.send("What's the status of " + id + "?");
+        });
+      });
+      scope.querySelectorAll("[data-talk-person]").forEach(function (b) {
+        b.addEventListener("click", function () {
+          var id = b.getAttribute("data-talk-person");
+          var c = SI.allClaims().filter(function (x) { return x.id === id; })[0];
+          var about = (c && c.peril) ? "your " + String(c.peril).toLowerCase() + " claim" : "claim " + id;
+          SI.ui.toast("A claims specialist will call you today about " + about + ".", "ai", { title: "Callback requested" });
+        });
+      });
+    }
+
+    function claimSummaryText(c) {
+      return "SELF-INSURE — CLAIM SUMMARY\n\n" +
+        "Claim:       " + c.id + "\n" +
+        "Policy:      " + A.policy.number + "\n" +
+        "Type:        " + c.title + "\n" +
+        "Filed:       " + (c.filedDisplay || (c.filedDate + " " + (c.filedTime || ""))) + "\n" +
+        "Status:      " + c.status + "\n\n" +
+        "Assessed damage:   " + fmt.currency0(c.grossAmount) + "\n" +
+        "Deductible:        " + fmt.currency0(c.deductibleApplied) + "\n" +
+        "Net payout:        " + fmt.currency0(c.netPayout) + "\n" +
+        "Funds timing:      " + (c.fundsTiming || "Same day") + "\n" +
+        "Method:            " + (c.payoutMethod || "ACH to linked account") + "\n\n" +
+        "Assessed by the Self-Insure AI model at " +
+        Math.round((c.decisionConfidence || .97) * 100) + "% confidence.\n";
+    }
+
+    /* =====================================================================
+       (C) CLAIM HISTORY TABLE
+       ===================================================================== */
+    function renderHistory() {
+      var all = SI.allClaims();
+      document.getElementById("hist-count").textContent = all.length;
+      // Footnote stays true regardless of how many demo claims have been filed this session.
+      var foot = document.getElementById("hist-footnote");
+      if (foot) {
+        foot.textContent = all.length === 1
+          ? "Claims-free from 2020 to early 2026 — CLM-31182 is your first claim in six years."
+          : "Your first claim in six years was CLM-31182 (filed today). Claims-free from 2020 to early 2026.";
+      }
+      document.getElementById("history-body").innerHTML = all.map(function (c) {
+        return '<tr data-hist="' + c.id + '">' +
+          '<td style="font-weight:600;">' + c.id + '</td>' +
+          '<td>' + c.title + '</td>' +
+          '<td>' + (c.filedDate === "2026-06-24" ? "Today" : fmt.date(c.filedDate)) + '</td>' +
+          '<td>' + statusPill(c.status) + '</td>' +
+          '<td class="td-num"><span class="num" style="font-size:13px;">' + fmt.currency0(c.netPayout) + '</span></td>' +
+          '<td class="td-action"><button class="btn btn-ghost btn-sm" data-hist-view="' + c.id + '">View ' +
+            '<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg></button></td>' +
+        '</tr>';
+      }).join("");
+      document.querySelectorAll("[data-hist-view]").forEach(function (b) {
+        b.addEventListener("click", function () {
+          var id = b.getAttribute("data-hist-view");
+          var c = SI.allClaims().filter(function (x) { return x.id === id; })[0];
+          if (isActive(c)) {
+            var card = document.querySelector('[data-claim="' + id + '"]');
+            if (card) { card.scrollIntoView({ behavior: "smooth", block: "center" }); flash(card); }
+          } else {
+            openClaimDetailModal(c);
+          }
+        });
+      });
+    }
+    function flash(el) {
+      el.style.transition = "box-shadow .2s";
+      el.style.boxShadow = "0 0 0 3px var(--ai-tint)";
+      setTimeout(function () { el.style.boxShadow = ""; }, 900);
+    }
+    function openClaimDetailModal(c) {
+      var node = document.createElement("div");
+      node.innerHTML =
+        '<div class="modal-head"><div class="modal-title">' + c.title + '</div>' +
+        '<button class="modal-close" data-close aria-label="Close">' + icon("x") + '</button></div>' +
+        '<div class="modal-body">' +
+          '<div style="display:flex;gap:10px;align-items:center;margin-bottom:14px;">' + statusPill(c.status) +
+          '<span class="muted tiny">' + c.id + ' · ' + fmt.date(c.filedDate) + '</span></div>' +
+          '<dl class="kv">' +
+            '<dt>Assessed damage</dt><dd>' + fmt.currency0(c.grossAmount) + '</dd>' +
+            '<dt>Deductible</dt><dd>' + fmt.currency0(c.deductibleApplied) + '</dd>' +
+            '<dt>Net payout</dt><dd class="ai-text">' + fmt.currency0(c.netPayout) + '</dd>' +
+          '</dl>' +
+        '</div>' +
+        '<div class="modal-foot"><button class="btn btn-primary" data-close>Close</button></div>';
+      SI.ui.openModal(node);
+    }
+
+    /* =====================================================================
+       (A) FILE-A-CLAIM WIZARD
+       ===================================================================== */
+    var STEPS = ["What happened", "Where & how bad", "Add photos", "Review & submit"];
+    var draft = {
+      step: 1,
+      peril: null,
+      dateOfLoss: "2026-06-24",
+      description: "",
+      area: null,
+      severity: "Moderate",
+      injuries: false,
+      photos: 0
+    };
+    var fileCard = document.getElementById("file");
+    var panel = document.getElementById("fc-panel");
+
+    function renderRail() {
+      document.getElementById("fc-steps").innerHTML = STEPS.map(function (label, i) {
+        var n = i + 1;
+        var cls = n < draft.step ? "done" : n === draft.step ? "active" : "";
+        return '<div class="wstep ' + cls + '"><span class="wnum">' +
+          (n < draft.step ? icon("check") : n) + '</span>' + label + '</div>';
+      }).join("");
+    }
+
+    function openWizard() {
+      draft.step = 1;
+      fileCard.style.display = "";
+      renderRail();
+      renderStep();
+      fileCard.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+    function closeWizard() { fileCard.style.display = "none"; }
+
+    function renderStep() {
+      renderRail();
+      var html = "";
+      if (draft.step === 1) html = stepWhat();
+      else if (draft.step === 2) html = stepWhere();
+      else if (draft.step === 3) html = stepPhotos();
+      else if (draft.step === 4) html = stepReview();
+      panel.innerHTML = '<div class="fc-step">' + html + '</div>';
+      wireStep();
+    }
+
+    /* --- STEP 1 --- */
+    function stepWhat() {
+      return '<div class="eyebrow" style="margin-bottom:12px;">Step 1 · What happened</div>' +
+        '<div class="field"><div class="label" style="margin-bottom:8px;">Type of loss</div>' +
+          '<div class="opt-grid" id="peril-grid">' + PERILS.map(function (p) {
+            return '<button type="button" class="opt' + (draft.peril === p.key ? " sel" : "") + '" data-peril="' + p.key + '">' +
+              '<span class="opt-ic">' + icon(p.icon) + '</span><span class="opt-name">' + p.name + '</span></button>';
+          }).join("") + '</div></div>' +
+        '<div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:16px;">' +
+          '<div class="field"><label for="fc-date">Date of loss</label>' +
+            '<input class="input" type="date" id="fc-date" value="' + draft.dateOfLoss + '" max="2026-06-24" /></div>' +
+          '<div class="field"><label for="fc-desc">Short description</label>' +
+            '<input class="input" type="text" id="fc-desc" placeholder="e.g. Hail dented the roof and gutters" value="' + escAttr(draft.description) + '" /></div>' +
+        '</div>' +
+        '<div class="field-error" id="fc-err1" style="margin-top:6px;"><span class="err-msg">Please choose a type of loss to continue.</span></div>' +
+        footer(false);
+    }
+
+    /* --- STEP 2 --- */
+    function stepWhere() {
+      return '<div class="eyebrow" style="margin-bottom:12px;">Step 2 · Where &amp; how bad</div>' +
+        '<div class="field"><div class="label" style="margin-bottom:8px;">Affected area</div>' +
+          '<div class="opt-grid" style="grid-template-columns:repeat(4,1fr);" id="area-grid">' + AREAS.map(function (a) {
+            return '<button type="button" class="opt' + (draft.area === a.key ? " sel" : "") + '" data-area="' + a.key + '">' +
+              '<span class="opt-ic">' + icon(a.icon) + '</span><span class="opt-name">' + a.name + '</span></button>';
+          }).join("") + '</div></div>' +
+        '<div class="field" style="margin-top:16px;"><div class="label" style="margin-bottom:8px;">Severity</div>' +
+          '<div class="segmented seg-full" id="sev-block" role="group" aria-label="Severity">' + SEVERITY.map(function (s) {
+            return '<button type="button" class="' + (draft.severity === s ? "active" : "") + '" data-sev="' + s + '">' + s + '</button>';
+          }).join("") + '</div></div>' +
+        '<label class="check" style="margin-top:18px;"><input type="checkbox" id="fc-injury"' + (draft.injuries ? " checked" : "") + ' /> Was anyone hurt?</label>' +
+        '<div class="field-error" id="fc-err2" style="margin-top:6px;"><span class="err-msg">Please select the affected area.</span></div>' +
+        footer(true);
+    }
+
+    /* --- STEP 3 --- */
+    function stepPhotos() {
+      return '<div class="eyebrow" style="margin-bottom:12px;">Step 3 · Add photos</div>' +
+        '<p class="muted tiny" style="margin-bottom:14px;">Photos help our AI assess the damage faster. Drag files in, or click to add — this is a demo, so no files actually upload.</p>' +
+        '<div class="dropzone" id="fc-drop" tabindex="0" role="button" aria-label="Add photos">' +
+          icon("upload") +
+          '<div style="font-weight:600;color:var(--text);">Drop photos here, or click to add</div>' +
+          '<div class="tiny muted-3" style="margin-top:3px;">JPG or PNG · up to 10 photos</div>' +
+        '</div>' +
+        '<div class="thumb-grid" id="fc-thumbs"></div>' +
+        footer(true);
+    }
+
+    /* --- STEP 4 --- */
+    function stepReview() {
+      var perilName = perilName_(draft.peril);
+      var areaName = (AREAS.filter(function (a) { return a.key === draft.area; })[0] || {}).name || "—";
+      return '<div class="eyebrow" style="margin-bottom:12px;">Step 4 · Review &amp; submit</div>' +
+        '<div class="card pad-sm" style="background:var(--surface-2);box-shadow:none;margin-bottom:16px;">' +
+          '<div class="rev-rows">' +
+            '<div class="rev-row"><span class="rev-k">Type of loss</span><span class="rev-v">' + perilName + '</span></div>' +
+            '<div class="rev-row"><span class="rev-k">Date of loss</span><span class="rev-v">' + fmt.date(draft.dateOfLoss) + '</span></div>' +
+            (draft.description ? '<div class="rev-row"><span class="rev-k">Description</span><span class="rev-v">' + escHtml(draft.description) + '</span></div>' : '') +
+            '<div class="rev-row"><span class="rev-k">Affected area</span><span class="rev-v">' + areaName + '</span></div>' +
+            '<div class="rev-row"><span class="rev-k">Severity</span><span class="rev-v">' + draft.severity + '</span></div>' +
+            '<div class="rev-row"><span class="rev-k">Injuries reported</span><span class="rev-v">' + (draft.injuries ? "Yes" : "No") + '</span></div>' +
+            '<div class="rev-row"><span class="rev-k">Photos attached</span><span class="rev-v">' + draft.photos + '</span></div>' +
+          '</div>' +
+        '</div>' +
+        '<div class="ai-summary" style="margin-bottom:4px;">' +
+          '<div class="ais-row" style="font-size:13px;">' + icon("info") +
+          'Your <strong>' + fmt.currency0(A.deductibles.allPerils.amount) + ' all-perils deductible</strong> will apply to this claim. Most claims are AI-assessed and decided in under a minute.</div>' +
+        '</div>' +
+        footerSubmit();
+    }
+
+    function footer(showBack) {
+      return '<div class="fc-foot">' +
+        (showBack ? '<button class="btn btn-ghost" data-fc-back>Back</button>' : '<span></span>') +
+        '<button class="btn btn-primary" data-fc-next>Continue ' +
+          '<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 5l7 7-7 7"/></svg></button>' +
+      '</div>';
+    }
+    function footerSubmit() {
+      return '<div class="fc-foot">' +
+        '<button class="btn btn-ghost" data-fc-back>Back</button>' +
+        '<button class="btn btn-primary" data-fc-submit>Submit claim</button>' +
+      '</div>';
+    }
+
+    function wireStep() {
+      // back / next / submit
+      var back = panel.querySelector("[data-fc-back]");
+      if (back) back.addEventListener("click", function () { if (draft.step > 1) { draft.step--; renderStep(); } });
+      var next = panel.querySelector("[data-fc-next]");
+      if (next) next.addEventListener("click", onNext);
+      var submit = panel.querySelector("[data-fc-submit]");
+      if (submit) submit.addEventListener("click", onSubmit);
+
+      // step 1 controls
+      panel.querySelectorAll("[data-peril]").forEach(function (b) {
+        b.addEventListener("click", function () {
+          draft.peril = b.getAttribute("data-peril");
+          panel.querySelectorAll("[data-peril]").forEach(function (x) { x.classList.toggle("sel", x === b); });
+          var err = document.getElementById("fc-err1"); if (err) err.classList.remove("field-error");
+        });
+      });
+      var dt = panel.querySelector("#fc-date"); if (dt) dt.addEventListener("change", function () { draft.dateOfLoss = dt.value || draft.dateOfLoss; });
+      var desc = panel.querySelector("#fc-desc"); if (desc) desc.addEventListener("input", function () { draft.description = desc.value; });
+
+      // step 2 controls
+      panel.querySelectorAll("[data-area]").forEach(function (b) {
+        b.addEventListener("click", function () {
+          draft.area = b.getAttribute("data-area");
+          panel.querySelectorAll("[data-area]").forEach(function (x) { x.classList.toggle("sel", x === b); });
+          var err = document.getElementById("fc-err2"); if (err) err.classList.remove("field-error");
+        });
+      });
+      panel.querySelectorAll("[data-sev]").forEach(function (b) {
+        b.addEventListener("click", function () {
+          draft.severity = b.getAttribute("data-sev");
+          panel.querySelectorAll("[data-sev]").forEach(function (x) { x.classList.toggle("active", x === b); });
+        });
+      });
+      var inj = panel.querySelector("#fc-injury"); if (inj) inj.addEventListener("change", function () { draft.injuries = inj.checked; });
+
+      // step 3 controls
+      var drop = panel.querySelector("#fc-drop");
+      if (drop) {
+        renderThumbs();
+        drop.addEventListener("click", addPhoto);
+        drop.addEventListener("keydown", function (e) { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); addPhoto(); } });
+        ["dragover", "dragenter"].forEach(function (ev) { drop.addEventListener(ev, function (e) { e.preventDefault(); drop.classList.add("drag"); }); });
+        ["dragleave", "drop"].forEach(function (ev) { drop.addEventListener(ev, function (e) { e.preventDefault(); drop.classList.remove("drag"); }); });
+        drop.addEventListener("drop", function (e) {
+          var n = (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files.length) ? e.dataTransfer.files.length : 1;
+          for (var i = 0; i < n && draft.photos < 10; i++) draft.photos++;
+          renderThumbs();
+        });
+      }
+    }
+
+    function addPhoto() { if (draft.photos < 10) { draft.photos++; renderThumbs(); } }
+    function renderThumbs() {
+      var grid = panel.querySelector("#fc-thumbs");
+      if (!grid) return;
+      var t = "";
+      for (var i = 0; i < draft.photos; i++) {
+        t += '<div class="thumb">' + icon("image") +
+          '<button class="thumb-x" data-rm="' + i + '" aria-label="Remove photo">' + icon("x") + '</button></div>';
+      }
+      if (draft.photos < 10) {
+        t += '<div class="thumb add-more" id="fc-add-more" role="button" tabindex="0" aria-label="Add another photo">' + icon("plus") + '</div>';
+      }
+      grid.innerHTML = t;
+      grid.querySelectorAll("[data-rm]").forEach(function (b) {
+        b.addEventListener("click", function (e) { e.stopPropagation(); draft.photos = Math.max(0, draft.photos - 1); renderThumbs(); });
+      });
+      var more = grid.querySelector("#fc-add-more");
+      if (more) {
+        more.addEventListener("click", addPhoto);
+        more.addEventListener("keydown", function (e) { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); addPhoto(); } });
+      }
+    }
+
+    function onNext() {
+      if (draft.step === 1 && !draft.peril) { document.getElementById("fc-err1").classList.add("field-error"); return; }
+      if (draft.step === 2 && !draft.area) { document.getElementById("fc-err2").classList.add("field-error"); return; }
+      if (draft.step < 4) { draft.step++; renderStep(); }
+    }
+
+    /* --- SUBMIT → AI TRIAGE ANIMATION → RESULT --- */
+    function onSubmit() {
+      // mark rail fully done
+      draft.step = 5;
+      renderRail();
+      playTriage();
+    }
+
+    // A reported injury (or a liability loss) is a bodily-injury event: the model escalates
+    // to a human specialist rather than auto-approving a property-damage payout.
+    function isReferral() { return !!draft.injuries || draft.peril === "liability"; }
+
+    function playTriage() {
+      var reduce = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+      var ded = fmt.currency0(A.deductibles.allPerils.amount);
+      var referred = isReferral();
+      var lines = referred ? [
+        "Reading submitted photos and details",
+        "Matching the loss to your HO-3 coverage",
+        "Flagging a reported injury for specialist review",
+        "Confirming your liability coverage is in force",
+        "Routing to a claims specialist"
+      ] : [
+        "Reading submitted photos and details",
+        "Matching the loss to your HO-3 coverage",
+        "Estimating repair / replacement cost",
+        "Applying your " + ded + " all-perils deductible",
+        "Finalizing the decision"
+      ];
+      panel.innerHTML =
+        '<div class="fc-step triage">' +
+          '<div class="triage-orb">' + icon("spark") + '</div>' +
+          '<div class="display" style="font-size:20px;margin-bottom:4px;">Assessing your claim…</div>' +
+          '<p class="muted tiny" style="margin-bottom:20px;">The Self-Insure AI is reviewing your submission.</p>' +
+          '<div class="triage-lines" id="triage-lines">' + lines.map(function (l) {
+            return '<div class="triage-line"><span class="tl-tick">' + icon("check") + '</span>' + l + '</div>';
+          }).join("") + '</div>' +
+        '</div>';
+
+      var rows = panel.querySelectorAll(".triage-line");
+      var i = 0;
+      var per = reduce ? 120 : 760;
+      var finish = referred ? showReferred : showResult;
+      function lightNext() {
+        if (i < rows.length) { rows[i].classList.add("on"); i++; setTimeout(lightNext, per); }
+        else { setTimeout(finish, reduce ? 150 : 600); }
+      }
+      setTimeout(lightNext, reduce ? 60 : 420);
+    }
+
+    function computeQuote() {
+      var gross = SEV_GROSS[draft.severity] || 9600;
+      // small deterministic nudge by peril so values aren't identical run-to-run
+      if (draft.peril === "fire") gross += 3000;
+      if (draft.peril === "theft") gross = Math.round(gross * 0.7);
+      if (draft.peril === "liability") gross = Math.round(gross * 0.55);
+      var deductible = A.deductibles.allPerils.amount; // 1500
+      var net = Math.max(0, gross - deductible);
+      var conf = 0.94 + (draft.photos >= 2 ? 0.03 : 0.01);
+      conf = Math.min(0.98, conf);
+      return { gross: gross, deductible: deductible, net: net, conf: conf };
+    }
+
+    // Clean, monotonic id independent of photo count: each new claim is +1 and always
+    // above the canonical CLM-31182 (first session claim → CLM-31191).
+    function nextClaimId() {
+      return "CLM-31" + (190 + SI.allClaims().length);
+    }
+
+    function showResult() {
+      var q = computeQuote();
+      var newId = nextClaimId();
+      var nowT = nowTimeStr();
+      var perilLabel = perilName_(draft.peril);
+
+      panel.innerHTML =
+        '<div class="fc-step center">' +
+          '<div class="result-check">' + icon("check") + '</div>' +
+          '<div class="display ai-text" style="font-size:26px;margin-bottom:2px;">Approved</div>' +
+          '<p class="muted" style="margin-bottom:4px;">Claim <strong style="color:var(--text);">' + newId + '</strong> · assessed in seconds</p>' +
+          '<div class="payout-math" style="max-width:520px;margin:18px auto 0;text-align:left;">' +
+            '<div class="pm-cell"><span class="pm-k">Assessed damage</span><span class="pm-v">' + fmt.currency0(q.gross) + '</span></div>' +
+            '<div class="pm-cell"><span class="pm-op">−</span><span class="pm-k">Deductible</span><span class="pm-v">' + fmt.currency0(q.deductible) + '</span></div>' +
+            '<div class="pm-cell net"><span class="pm-op">=</span><span class="pm-k">Net payout · same day</span><span class="pm-v">' + fmt.currency0(q.net) + '</span></div>' +
+          '</div>' +
+          '<div class="conf-wrap">' +
+            '<div class="conf-row"><span>Model confidence</span><span class="ai-text" style="font-weight:700;">' + Math.round(q.conf * 100) + '%</span></div>' +
+            '<div class="confidence-meter"><div class="cm-fill" id="res-conf"></div></div>' +
+          '</div>' +
+          '<p class="tiny muted-3" style="max-width:420px;margin:16px auto 0;">' +
+            'Most claims are approved instantly. A small share are referred to a human underwriter — yours wasn\'t. ' +
+            'Funds will be sent to your Visa •4242 / linked account today.</p>' +
+          '<div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin-top:20px;">' +
+            '<button class="btn btn-primary" id="res-track">Track this claim</button>' +
+            '<button class="btn btn-ghost" id="res-done">Done</button>' +
+          '</div>' +
+        '</div>';
+
+      setTimeout(function () { var f = document.getElementById("res-conf"); if (f) f.style.width = Math.round(q.conf * 100) + "%"; }, 120);
+
+      // build the new claim record + persist for the session
+      var claim = {
+        id: newId,
+        type: "Property damage",
+        peril: perilLabel,
+        area: (AREAS.filter(function (a) { return a.key === draft.area; })[0] || {}).name || "Property",
+        title: perilLabel + " — " + ((AREAS.filter(function (a) { return a.key === draft.area; })[0] || {}).name || "property").toLowerCase() + " damage",
+        status: "Approved",
+        statusStage: 4,
+        filedDate: "2026-06-24",
+        filedTime: nowT,
+        filedDisplay: "Today · " + nowT,
+        aiAssessed: true,
+        grossAmount: q.gross,
+        deductibleApplied: q.deductible,
+        netPayout: q.net,
+        payoutMethod: "ACH to Visa •4242 / linked account",
+        fundsTiming: "Same day",
+        decisionConfidence: q.conf,
+        timeline: [
+          { stage: 1, label: "Claim submitted",         time: nowT, done: true, detail: "Photos and details received." },
+          { stage: 2, label: "AI damage assessment",    time: nowT, done: true, detail: "Imagery + policy data analyzed in seconds." },
+          { stage: 3, label: "Coverage & deductible",   time: nowT, done: true, detail: perilLabel + " confirmed as a covered peril; " + fmt.currency0(q.deductible) + " deductible applied." },
+          { stage: 4, label: "Approved — payout issued", time: nowT, done: true, detail: fmt.currency0(q.net) + " approved, net of deductible. Funds same day." }
+        ]
+      };
+      SI.state.addClaim(claim);
+      SI.state.addActivity({
+        id: "ACT-" + Date.now(), icon: "check", tone: "ai", date: "2026-06-24", time: nowT,
+        title: "Claim approved", body: claim.id + " approved for " + fmt.currency0(q.net) + ". Funds arriving today.",
+        link: "claims.html", unread: true
+      });
+
+      // re-render the live sections beneath
+      renderActive();
+      renderHistory();
+
+      document.getElementById("res-track").addEventListener("click", function () {
+        closeWizard();
+        var card = document.querySelector('[data-claim="' + newId + '"]');
+        if (card) { card.scrollIntoView({ behavior: "smooth", block: "center" }); flash(card); }
+      });
+      document.getElementById("res-done").addEventListener("click", function () {
+        closeWizard();
+        document.getElementById("active-claims").scrollIntoView({ behavior: "smooth", block: "start" });
+      });
+    }
+
+    /* --- REFERRED OUTCOME (reported injury / liability) → human specialist, no instant payout --- */
+    function showReferred() {
+      var newId = nextClaimId();
+      var nowT = nowTimeStr();
+      var perilLabel = perilName_(draft.peril);
+      var areaName = (AREAS.filter(function (a) { return a.key === draft.area; })[0] || {}).name || "Property";
+
+      panel.innerHTML =
+        '<div class="fc-step center">' +
+          '<div class="result-check" style="background:var(--info);color:var(--brand-ink);">' + icon("user") + '</div>' +
+          '<div class="display" style="font-size:26px;margin-bottom:2px;color:var(--info);">Referred to a specialist</div>' +
+          '<p class="muted" style="margin-bottom:4px;">Claim <strong style="color:var(--text);">' + newId + '</strong> · received and routed</p>' +
+          '<div class="ai-summary" style="max-width:520px;margin:18px auto 0;text-align:left;">' +
+            '<div class="ais-rows">' +
+              '<div class="ais-row">' + icon("check") + 'Your submission was received and logged.</div>' +
+              '<div class="ais-row">' + icon("info") + 'Because an injury was reported, your claim is routed to a claims specialist for review rather than an instant decision.</div>' +
+              '<div class="ais-row">' + icon("info") + 'A claims specialist will contact you today to walk through next steps.</div>' +
+            '</div>' +
+          '</div>' +
+          '<p class="tiny muted-3" style="max-width:420px;margin:16px auto 0;">' +
+            'Most property claims are approved instantly. Claims involving a reported injury are reviewed by a human specialist — this is the model knowing when to escalate.</p>' +
+          '<div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin-top:20px;">' +
+            '<button class="btn btn-primary" id="res-track">Track this claim</button>' +
+            '<button class="btn btn-ghost" id="res-done">Done</button>' +
+          '</div>' +
+        '</div>';
+
+      // build the referred claim record + persist for the session
+      var claim = {
+        id: newId,
+        type: "Liability / injury",
+        peril: perilLabel,
+        area: areaName,
+        title: perilLabel + " — injury reported",
+        status: "Referred",
+        statusStage: 2,
+        filedDate: "2026-06-24",
+        filedTime: nowT,
+        filedDisplay: "Today · " + nowT,
+        aiAssessed: false,
+        grossAmount: 0,
+        deductibleApplied: A.deductibles.allPerils.amount,
+        netPayout: 0,
+        payoutMethod: "Pending specialist review",
+        fundsTiming: "Pending review",
+        decisionConfidence: null,
+        timeline: [
+          { stage: 1, label: "Claim submitted",          time: nowT, done: true,  detail: "Photos and details received." },
+          { stage: 2, label: "Routed to a specialist",   time: nowT, done: false, detail: "A reported injury was flagged for human review." },
+          { stage: 3, label: "Specialist review",        time: "—",  done: false, detail: "A claims specialist will contact you today." },
+          { stage: 4, label: "Decision",                 time: "—",  done: false, detail: "Resolved after specialist review." }
+        ]
+      };
+      SI.state.addClaim(claim);
+      SI.state.addActivity({
+        id: "ACT-" + Date.now(), icon: "claim", tone: "info", date: "2026-06-24", time: nowT,
+        title: "Claim referred", body: claim.id + " was routed to a claims specialist. They'll contact you today.",
+        link: "claims.html", unread: true
+      });
+
+      // re-render the live sections beneath
+      renderActive();
+      renderHistory();
+
+      document.getElementById("res-track").addEventListener("click", function () {
+        closeWizard();
+        var card = document.querySelector('[data-claim="' + newId + '"]');
+        if (card) { card.scrollIntoView({ behavior: "smooth", block: "center" }); flash(card); }
+      });
+      document.getElementById("res-done").addEventListener("click", function () {
+        closeWizard();
+        document.getElementById("active-claims").scrollIntoView({ behavior: "smooth", block: "start" });
+      });
+    }
+
+    /* =====================================================================
+       HELPERS
+       ===================================================================== */
+    function perilName_(key) {
+      var p = PERILS.filter(function (x) { return x.key === key; })[0];
+      return p ? p.name : "Property damage";
+    }
+    function nowTimeStr() {
+      var d = new Date(), h = d.getHours(), mm = ("0" + d.getMinutes()).slice(-2);
+      var ap = h >= 12 ? "PM" : "AM"; h = h % 12 || 12; return h + ":" + mm + " " + ap;
+    }
+    function escHtml(s) { return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;"); }
+    function escAttr(s) { return escHtml(s).replace(/"/g, "&quot;"); }
+
+    /* =====================================================================
+       WIRE-UP + INITIAL RENDER
+       ===================================================================== */
+    document.getElementById("start-claim-btn").addEventListener("click", openWizard);
+    document.getElementById("fc-cancel-top").addEventListener("click", closeWizard);
+
+    renderActive();
+    renderHistory();
+
+    // deep-link: #file opens the wizard directly (dashboard / cmdk CTA)
+    if (location.hash === "#file") { openWizard(); }
+    window.addEventListener("hashchange", function () { if (location.hash === "#file") openWizard(); });
+
+    // keep lists fresh if a payment/activity/state event fires elsewhere
+    window.addEventListener("selfinsure:state", function () { renderActive(); renderHistory(); });
+  });
+  </script>
+</body>
+</html>
