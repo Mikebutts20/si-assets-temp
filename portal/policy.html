@@ -1,0 +1,898 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Policy & coverage · Self-Insure</title>
+  <script src="theme.js"></script>
+  <link rel="stylesheet" href="styles.css" />
+  <style>
+    /* ----- policy.html scoped tweaks (composed from the shared kit) ----- */
+
+    /* Header strip */
+    .pol-hero { display:flex; align-items:flex-start; justify-content:space-between; gap:20px; flex-wrap:wrap; margin-bottom:8px; }
+    .pol-hero .ph-left { min-width:0; }
+    .pol-meta { display:flex; align-items:center; flex-wrap:wrap; gap:8px 14px; margin-top:10px; }
+    .pol-meta .pm-item { display:inline-flex; align-items:center; gap:7px; font-size:12.5px; color:var(--text-2); }
+    .pol-meta .pm-item svg { width:14px; height:14px; color:var(--text-3); }
+    .pol-meta .pm-item strong { color:var(--text); font-weight:600; }
+    .pol-hero .ph-actions { display:flex; gap:8px; flex-wrap:wrap; }
+
+    /* Sticky anchor tabs */
+    .pol-tabs {
+      position:sticky; top:var(--topbar-h); z-index:20;
+      display:flex; gap:2px; padding:8px 0 6px;
+      margin:18px 0 22px; border-bottom:1px solid var(--border);
+      background:color-mix(in srgb, var(--bg) 86%, transparent);
+      backdrop-filter:saturate(140%) blur(10px); -webkit-backdrop-filter:saturate(140%) blur(10px);
+      overflow-x:auto; scrollbar-width:none;
+    }
+    .pol-tabs::-webkit-scrollbar { display:none; }
+    .pol-tab {
+      position:relative; white-space:nowrap;
+      padding:8px 14px; border-radius:8px; border:0; background:transparent;
+      color:var(--text-2); font-size:13px; font-weight:600; font-family:inherit;
+      transition:color .15s var(--ease), background .15s var(--ease);
+    }
+    .pol-tab:hover { color:var(--text); background:var(--surface-2); }
+    .pol-tab.active { color:var(--ai); }
+    .pol-tab.active::after {
+      content:""; position:absolute; left:14px; right:14px; bottom:-7px; height:2px;
+      border-radius:2px 2px 0 0; background:var(--ai);
+    }
+
+    .anchor-pad { scroll-margin-top:calc(var(--topbar-h) + 64px); }
+
+    /* Coverage rows (expandable) */
+    .cov-row {
+      border:1px solid var(--border); border-radius:var(--r-ctrl);
+      background:var(--surface); margin-bottom:10px; overflow:hidden;
+      transition:border-color .15s var(--ease);
+    }
+    .cov-row:hover { border-color:var(--brand-border); }
+    .cov-row.open { border-color:var(--ai-border); }
+    .cov-head {
+      display:flex; align-items:center; gap:14px; width:100%;
+      padding:15px 16px; background:transparent; border:0; text-align:left; font-family:inherit;
+    }
+    .cov-head .cov-name { flex:1; min-width:0; }
+    .cov-head .cov-name .cn-title { font-size:14px; font-weight:600; color:var(--text); }
+    .cov-head .cov-name .cn-blurb { font-size:12px; color:var(--text-2); margin-top:1px; }
+    .cov-head .cov-amt { font-family:var(--font-display); font-weight:500; font-size:19px; color:var(--brand); font-variant-numeric:tabular-nums; white-space:nowrap; }
+    .cov-head .cov-caret { color:var(--text-3); transition:transform .2s var(--ease); flex:0 0 auto; }
+    .cov-head .cov-caret svg { width:16px; height:16px; display:block; }
+    .cov-row.open .cov-caret { transform:rotate(90deg); color:var(--ai); }
+    .cov-detail { max-height:0; overflow:hidden; transition:max-height .28s var(--ease); }
+    .cov-row.open .cov-detail { max-height:260px; }
+    .cov-detail-inner { padding:0 16px 16px 54px; }
+    .cov-detail-inner p { font-size:12.5px; color:var(--text-2); line-height:1.55; margin-bottom:12px; }
+
+    /* coverage legend (next to doughnut) */
+    .cov-legend { display:flex; flex-direction:column; gap:11px; }
+    .cl-item { display:flex; align-items:center; gap:10px; }
+    .cl-swatch { width:11px; height:11px; border-radius:3px; flex:0 0 11px; }
+    .cl-name { font-size:12.5px; color:var(--text-2); flex:1; }
+    .cl-val { font-family:var(--font-display); font-size:14px; color:var(--text); font-variant-numeric:tabular-nums; }
+
+    /* ROP tier cards */
+    .tier-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:14px; }
+    @media (max-width:760px){ .tier-grid { grid-template-columns:1fr; } }
+    .tier {
+      position:relative; border:1px solid var(--border); border-radius:var(--r-card);
+      background:var(--surface); padding:18px; overflow:hidden;
+      transition:transform .18s var(--ease), box-shadow .18s var(--ease), border-color .18s;
+    }
+    .tier:hover { transform:translateY(-2px); box-shadow:var(--shadow-lg); }
+    .tier.current { border-color:var(--ai-border); background:var(--ai-tint); }
+    .tier.gold { border-color:var(--brand-border); }
+    .tier .tier-top { display:flex; align-items:center; justify-content:space-between; margin-bottom:12px; }
+    .tier .tier-name { font-family:var(--font-display); font-size:17px; font-weight:600; color:var(--text); }
+    .tier .tier-pct { font-family:var(--font-display); font-size:34px; font-weight:500; color:var(--brand); line-height:1; letter-spacing:-.01em; }
+    .tier.current .tier-pct { color:var(--ai); }
+    /* Gold tier 100% uses a dedicated warm-gold token so it stays gold in BOTH
+       themes (the brand token would render near-black on white). */
+    .tier.gold .tier-pct { color:var(--gold); }
+    .tier .tier-back { font-size:13px; color:var(--text-2); margin-top:6px; }
+    .tier .tier-back strong { color:var(--text); font-weight:600; }
+    .tier .tier-term { font-size:12px; color:var(--text-3); margin-top:2px; }
+    .tier .tier-foot { margin-top:14px; padding-top:13px; border-top:1px solid var(--border); }
+
+    /* deductible cards */
+    .ded-card { border:1px solid var(--border); border-radius:var(--r-card); background:var(--surface); padding:20px; }
+    .ded-card .ded-val { font-family:var(--font-display); font-size:32px; font-weight:500; color:var(--brand); line-height:1; letter-spacing:-.01em; }
+    .ded-card .ded-name { font-size:13px; font-weight:600; color:var(--text); margin-top:8px; }
+    .ded-card .ded-when { font-size:12.5px; color:var(--text-2); margin-top:5px; line-height:1.5; }
+
+    /* worked example callout */
+    .worked {
+      border:1px solid var(--ai-border); background:var(--ai-tint); border-radius:var(--r-card);
+      padding:18px 20px; display:flex; align-items:center; gap:22px; flex-wrap:wrap;
+    }
+    .worked .we-step { text-align:center; }
+    .worked .we-k { font-size:11px; color:var(--text-2); text-transform:uppercase; letter-spacing:.05em; }
+    .worked .we-v { font-family:var(--font-display); font-size:24px; font-weight:500; color:var(--text); font-variant-numeric:tabular-nums; }
+    .worked .we-v.ai { color:var(--ai); }
+    .worked .we-op { font-family:var(--font-display); font-size:22px; color:var(--text-3); }
+
+    /* explainer callout */
+    .callout { display:flex; gap:13px; padding:16px 18px; border-radius:var(--r-card); background:var(--surface-2); border:1px solid var(--border); }
+    .callout .co-ico { width:34px; height:34px; flex:0 0 34px; border-radius:9px; background:var(--ai-tint); color:var(--ai); display:grid; place-items:center; }
+    .callout .co-ico svg { width:18px; height:18px; }
+    .callout .co-body { font-size:12.5px; color:var(--text-2); line-height:1.55; }
+    .callout .co-body strong { color:var(--text); font-weight:600; }
+
+    /* inline ID card preview */
+    .idcard-wrap { display:flex; gap:22px; align-items:center; flex-wrap:wrap; }
+    .idcard-wrap .id-card { flex:1 1 320px; max-width:380px; cursor:pointer; }
+    .idcard-wrap .id-card:hover { transform:translateY(-2px); transition:transform .18s var(--ease); }
+    .idcard-aside { flex:1 1 240px; min-width:0; }
+
+    /* document rows */
+    .doc-row { display:flex; align-items:center; gap:14px; padding:13px 4px; border-bottom:1px solid var(--border-2); }
+    .doc-row:last-child { border-bottom:0; }
+    .doc-row .dr-body { flex:1; min-width:0; }
+    .doc-row .dr-name { font-size:13.5px; font-weight:600; color:var(--text); }
+    .doc-row .dr-meta { font-size:11.5px; color:var(--text-3); margin-top:1px; }
+    .doc-row .dr-actions { display:flex; gap:6px; flex-shrink:0; }
+
+    /* facsimile document viewer
+       Intentionally a light "printed paper" look in BOTH themes (it represents a
+       physical document). The paper greys stay hard-coded on purpose, but the two
+       BRAND-COUPLED values are tokenised so they never silently drift from the
+       design system:
+         --paper-ink    = the document's near-black ink (tracks light-theme --brand)
+         --paper-accent = the doctype/stamp accent (tracks light-theme --ai, the
+                          deep mint). If the mint is ever retuned, update --ai and
+                          this follows — do NOT re-hardcode #0f9d63 here. */
+    .facsimile {
+      --paper-ink:    #15161b;   /* document ink — keep in step with light-theme --brand (#0c0d10 family) */
+      --paper-accent: #0f9d63;   /* doctype + stamp — MUST track the light-theme --ai (deep mint) */
+      background:#fff; color:var(--paper-ink); border-radius:8px; padding:30px 32px; font-family:var(--font-ui); box-shadow:inset 0 0 0 1px rgba(0,0,0,.06);
+    }
+    .facsimile .fx-head { display:flex; justify-content:space-between; align-items:flex-start; border-bottom:2px solid var(--paper-ink); padding-bottom:14px; margin-bottom:18px; }
+    .facsimile .fx-brand { font-family:var(--font-display); font-size:22px; font-weight:600; color:#0c0d10; }
+    .facsimile .fx-tag { font-size:11px; color:#6b6760; font-style:italic; }
+    .facsimile .fx-doctype { font-size:11px; font-weight:700; letter-spacing:.08em; text-transform:uppercase; color:var(--paper-accent); text-align:right; }
+    .facsimile .fx-sub { font-size:11px; color:#8a8a85; text-align:right; margin-top:3px; }
+    .facsimile h4 { font-size:11px; font-weight:700; letter-spacing:.06em; text-transform:uppercase; color:#8a8a85; margin:18px 0 9px; }
+    .facsimile .fx-kv { display:grid; grid-template-columns:160px 1fr; gap:7px 14px; font-size:13px; }
+    .facsimile .fx-kv dt { color:#5b5b57; }
+    .facsimile .fx-kv dd { margin:0; color:var(--paper-ink); font-weight:600; }
+    .facsimile table.fx-tbl { width:100%; border-collapse:collapse; font-size:12.5px; margin-top:4px; }
+    .facsimile table.fx-tbl th { text-align:left; padding:7px 8px; background:#f6f6f4; color:#5b5b57; font-size:10.5px; text-transform:uppercase; letter-spacing:.04em; border-bottom:1px solid #e4e4e0; }
+    .facsimile table.fx-tbl td { padding:7px 8px; border-bottom:1px solid #efefec; }
+    .facsimile table.fx-tbl td.num { text-align:right; font-variant-numeric:tabular-nums; font-weight:600; }
+    .facsimile .fx-foot { margin-top:20px; padding-top:12px; border-top:1px solid #e4e4e0; font-size:10.5px; color:#8a8a85; line-height:1.5; }
+    .facsimile .fx-stamp { display:inline-block; margin-top:14px; padding:5px 11px; border:1.5px solid var(--paper-accent); color:var(--paper-accent); border-radius:6px; font-size:11px; font-weight:700; letter-spacing:.05em; text-transform:uppercase; }
+
+    /* property kv card */
+    .prop-grid { display:grid; grid-template-columns:1fr 1fr; gap:0 40px; }
+    @media (max-width:600px){ .prop-grid { grid-template-columns:1fr; } }
+    .prop-kv { display:flex; align-items:center; justify-content:space-between; gap:14px; padding:12px 0; border-bottom:1px solid var(--border-2); }
+    .prop-kv:last-child { border-bottom:0; }
+    .prop-kv .pk-k { font-size:13px; color:var(--text-2); }
+    .prop-kv .pk-v { font-size:13px; font-weight:600; color:var(--text); font-variant-numeric:tabular-nums; }
+
+    .link-quiet { color:var(--ai); font-weight:600; font-size:12.5px; background:none; border:0; padding:0; font-family:inherit; cursor:pointer; }
+    .link-quiet:hover { text-decoration:underline; }
+  </style>
+  <link rel="icon" type="image/svg+xml" href="favicon.svg">
+</head>
+<body>
+  <div data-content data-wide>
+
+    <!-- ============ HEADER STRIP ============ -->
+    <div class="pol-hero">
+      <div class="ph-left">
+        <div class="eyebrow" style="margin-bottom:7px;">Policy &amp; coverage</div>
+        <h2 class="display" style="font-size:30px;">
+          <span id="pol-product">HO-3 Homeowners</span>
+          <span class="pill pill-ai" style="vertical-align:middle;margin-left:8px;"><span class="dot"></span><span id="pol-status">Active</span></span>
+        </h2>
+        <div class="pol-meta">
+          <span class="pm-item">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg>
+            Policy <strong id="pol-num">SI-OH-204871</strong>
+          </span>
+          <span class="pm-item">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+            Term <strong id="pol-term">Jan 1, 2026 – Jan 1, 2027</strong>
+          </span>
+          <span class="pm-item">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10l9-7 9 7v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M9 21V12h6v9"/></svg>
+            <strong id="pol-addr">418 Walhalla Road, Columbus, OH</strong>
+          </span>
+        </div>
+        <div class="chip-row" style="margin-top:12px;">
+          <span class="pill pill-ai"><span class="dot"></span>Same-day AI-underwritten</span>
+          <span class="pill" id="pol-renews"></span>
+        </div>
+      </div>
+      <div class="ph-actions">
+        <button class="btn btn-ghost btn-sm" id="btn-id-card">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="5" width="20" height="15" rx="2"/><path d="M16 12h.01M2 9h20"/></svg>
+          View ID card
+        </button>
+        <button class="btn btn-primary btn-sm" id="btn-dl-dec">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
+          Declarations
+        </button>
+      </div>
+    </div>
+
+    <!-- ============ ANCHOR TABS ============ -->
+    <nav class="pol-tabs" id="pol-tabs" aria-label="Policy sections">
+      <button class="pol-tab active" data-tab="coverage">Coverage</button>
+      <button class="pol-tab" data-tab="property">Property</button>
+      <button class="pol-tab" data-tab="rop">Return of Premium</button>
+      <button class="pol-tab" data-tab="deductibles">Deductibles</button>
+      <button class="pol-tab" data-tab="documents">Documents</button>
+    </nav>
+
+    <!-- ============ COVERAGE ============ -->
+    <section class="section anchor-pad" id="coverage">
+      <div class="section-head">
+        <h3 class="section-title">What your policy covers</h3>
+        <button class="btn btn-ghost btn-sm" id="btn-adjust">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>
+          Adjust coverage
+        </button>
+      </div>
+
+      <div class="grid grid-12">
+        <!-- A–F coverage list -->
+        <div class="col-7">
+          <div id="coverage-rows"></div>
+          <p class="tiny muted-3" style="margin-top:4px;">Tap a coverage to see what it means and whether it's enough for your home.</p>
+        </div>
+
+        <!-- coverage mix doughnut -->
+        <div class="col-5">
+          <div class="card">
+            <div class="card-head"><div class="card-title">Coverage mix</div></div>
+            <div style="height:180px;position:relative;margin-bottom:18px;">
+              <canvas id="cov-chart"></canvas>
+              <div style="position:absolute;inset:0;display:grid;place-items:center;pointer-events:none;">
+                <div style="text-align:center;">
+                  <div class="num" style="font-size:24px;" id="cov-total">$1.06M</div>
+                  <div class="tiny muted-3">total limits</div>
+                </div>
+              </div>
+            </div>
+            <div class="cov-legend" id="cov-legend"></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ PROPERTY ============ -->
+    <section class="section anchor-pad" id="property">
+      <div class="section-head">
+        <h3 class="section-title">The insured home</h3>
+        <button class="link-quiet" id="ask-prop">These details look wrong?</button>
+      </div>
+      <div class="card">
+        <div class="prop-grid" id="prop-grid"></div>
+      </div>
+    </section>
+
+    <!-- ============ RETURN OF PREMIUM ============ -->
+    <section class="section anchor-pad" id="rop">
+      <div class="section-head">
+        <h3 class="section-title">Return of Premium</h3>
+        <span class="pill pill-brand">the insurance that gives it back</span>
+      </div>
+
+      <div class="grid grid-12" style="margin-bottom:18px;">
+        <!-- hero -->
+        <div class="card card-ai col-7">
+          <div class="card-head">
+            <div class="card-title">
+              <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 9-9"/><path d="M3 4v5h5"/><path d="M12 7v5l3 2"/></svg>
+              Your Bronze return
+            </div>
+            <span class="pill pill-ai" id="rop-track"><span class="dot"></span>On track</span>
+          </div>
+          <div class="figure-xl ai"><span id="rop-amt">$7,500</span></div>
+          <div class="muted" style="margin-bottom:18px;">coming back at year 10 · <span id="rop-status">Year 6 of 10 · claims-free</span></div>
+          <div class="progress" aria-label="Return of Premium progress"><div class="fill" id="rop-fill"></div></div>
+          <div class="progress-labels"><span id="rop-start">Year 1 · 2020</span><span id="rop-end">Year 10 · $7,500</span></div>
+          <div class="tiny muted-3" style="margin-top:12px;">
+            You've paid <strong style="color:var(--text);" id="rop-paid">$9,000</strong> in premium so far — <strong style="color:var(--ai);" id="rop-inside">$7,500</strong> of that is reserved inside your return milestone.
+          </div>
+        </div>
+
+        <!-- trajectory chart -->
+        <div class="card col-5">
+          <div class="card-head">
+            <div class="card-title">Premium back over time</div>
+            <span class="pill pill-ai"><span class="dot"></span>You are here · Y6</span>
+          </div>
+          <div style="height:180px;"><canvas id="rop-chart"></canvas></div>
+          <div style="display:flex;gap:16px;margin-top:12px;font-size:11.5px;flex-wrap:wrap;">
+            <span class="muted" style="display:inline-flex;align-items:center;gap:6px;"><span style="width:10px;height:2px;background:var(--ai);display:inline-block;border-radius:2px;"></span>Return earned</span>
+            <span class="muted" style="display:inline-flex;align-items:center;gap:6px;"><span style="width:10px;height:0;border-top:2px dashed var(--brand);display:inline-block;"></span>Return target · $7,500</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- tier cards -->
+      <div class="tier-grid" id="tier-grid" style="margin-bottom:18px;"></div>
+
+      <!-- honest explainer -->
+      <div class="callout">
+        <span class="co-ico">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 16v-4M12 8h.01"/></svg>
+        </span>
+        <div class="co-body">
+          <strong>Every claims-free year moves you toward your return.</strong> One paid claim doesn't erase it — your tier and timeline simply adjust. Your roof claim (CLM-31182) was paid same-day and your Bronze return remains on track for <strong>$7,500 at year 10</strong>.
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ DEDUCTIBLES ============ -->
+    <section class="section anchor-pad" id="deductibles">
+      <div class="section-head">
+        <h3 class="section-title">Your deductibles</h3>
+        <button class="chip chip-ai" data-ask="What's my deductible?">Ask about my deductible</button>
+      </div>
+
+      <div class="grid grid-2" style="margin-bottom:18px;">
+        <div class="ded-card">
+          <div class="ded-val" id="ded-allperils">$1,500</div>
+          <div class="ded-name">All-perils deductible</div>
+          <div class="ded-when">The flat amount you pay out of pocket on most claims — fire, theft, water, liability — before your coverage pays the rest.</div>
+        </div>
+        <div class="ded-card">
+          <div class="ded-val" id="ded-windhail">$4,200</div>
+          <div class="ded-name">Windstorm deductible · 1% of Dwelling</div>
+          <div class="ded-when">A percentage deductible that applies only to windstorm losses (named storms and high winds), calculated as 1% of your <span id="ded-dw">$420,000</span> Dwelling limit. Hail rides under your flat all-perils deductible.</div>
+        </div>
+      </div>
+
+      <!-- worked example tied to the claim -->
+      <div class="worked">
+        <div style="font-size:12.5px;color:var(--text-2);max-width:170px;line-height:1.5;">
+          <strong style="color:var(--text);">Worked example</strong><br/>Your roof / hail claim, this morning.
+        </div>
+        <div class="we-step">
+          <div class="we-k">Assessed damage</div>
+          <div class="we-v" id="we-gross">$12,900</div>
+        </div>
+        <span class="we-op">−</span>
+        <div class="we-step">
+          <div class="we-k">Deductible</div>
+          <div class="we-v" id="we-ded">$1,500</div>
+        </div>
+        <span class="we-op">=</span>
+        <div class="we-step">
+          <div class="we-k">You received</div>
+          <div class="we-v ai" id="we-net">$11,400</div>
+        </div>
+        <a class="btn btn-ai-ghost btn-sm" href="claims.html" style="margin-left:auto;">See the claim
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 5l7 7-7 7"/></svg>
+        </a>
+      </div>
+    </section>
+
+    <!-- ============ DOCUMENTS ============ -->
+    <section class="section anchor-pad" id="documents">
+      <div class="section-head">
+        <h3 class="section-title">Policy documents</h3>
+        <a class="card-link" href="documents.html">Document center
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg></a>
+      </div>
+
+      <div class="grid grid-12">
+        <!-- documents list -->
+        <div class="col-7">
+          <div class="card">
+            <div id="doc-list"></div>
+          </div>
+        </div>
+
+        <!-- inline ID card preview -->
+        <div class="col-5">
+          <div class="card">
+            <div class="card-head"><div class="card-title">Proof of insurance</div></div>
+            <div class="idcard-wrap">
+              <div class="id-card" id="mini-id" role="button" tabindex="0" aria-label="Open digital ID card">
+                <div class="id-glow"></div>
+                <div class="id-head">
+                  <div>
+                    <div class="id-brand">Self-Insure</div>
+                    <div class="id-sub">Proof of Insurance</div>
+                  </div>
+                  <div class="id-qr" id="mini-qr"></div>
+                </div>
+                <div class="id-row">
+                  <div><div class="id-k">Member</div><div class="id-v" id="id-member">Eleanor Marsh</div></div>
+                  <div><div class="id-k">Policy</div><div class="id-v" id="id-policy">SI-OH-204871</div></div>
+                </div>
+                <div class="id-row">
+                  <div><div class="id-k">Form</div><div class="id-v" id="id-form">HO-3 Homeowners</div></div>
+                  <div><div class="id-k">Term</div><div class="id-v" id="id-term">Jan 1, 2026 – Jan 1, 2027</div></div>
+                </div>
+              </div>
+              <div class="idcard-aside">
+                <p class="tiny muted" style="margin-bottom:12px;line-height:1.55;">Your digital ID card is accepted as proof of insurance. Tap the card to open, add to your wallet, or download.</p>
+                <button class="btn btn-primary btn-sm btn-block" id="open-id-2">Open ID card</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+  </div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+  <script src="account.js"></script>
+  <script src="intents.js"></script>
+  <script src="app.js"></script>
+  <script>
+    document.addEventListener("selfinsure:ready", function () {
+      var A = SI.account, fmt = SI.fmt, icon = SI.icon;
+      var P = A.policy, R = A.rop, D = A.deductibles;
+
+      /* ---------- HEADER STRIP ---------- */
+      document.getElementById("pol-product").textContent = P.form;
+      document.getElementById("pol-status").textContent = P.status.charAt(0) + P.status.slice(1).toLowerCase();
+      document.getElementById("pol-num").textContent = P.number;
+      document.getElementById("pol-term").textContent =
+        fmt.dateShort(P.termStart) + ", " + P.termStart.slice(0, 4) + " – " +
+        fmt.dateShort(P.termEnd) + ", " + P.termEnd.slice(0, 4);
+      document.getElementById("pol-addr").textContent =
+        P.propertyAddress.line1 + ", " + P.propertyAddress.city + ", " + P.propertyAddress.state;
+      document.getElementById("pol-renews").textContent = "Renews " + fmt.date(P.termEnd);
+
+      /* ---------- COVERAGE ROWS (expandable) ---------- */
+      var covExtra = {
+        A: "Coverage A rebuilds your home's structure — walls, roof, built-in systems — up to its limit after a covered loss, using current replacement cost rather than depreciated value. Your $420,000 limit reflects what it would cost to rebuild today.",
+        B: "Detached structures on your property — a fence, shed, or detached garage — are covered at 10% of your Dwelling limit. Damage to these is paid separately from your home itself.",
+        C: "Your belongings are covered anywhere in the world at 50% of your Dwelling limit. Certain categories (jewelry, electronics, collectibles) have sub-limits; scheduled endorsements can raise those if needed.",
+        D: "If a covered loss makes your home uninhabitable, Loss of Use pays your additional living expenses — temporary housing, meals, storage — at 20% of your Dwelling limit while repairs happen.",
+        E: "Personal Liability protects you if you're legally responsible for someone else's injury or property damage, covering legal defense and settlements up to $300,000.",
+        F: "Medical Payments covers minor medical bills for guests hurt on your property, regardless of fault — a goodwill coverage that can prevent small incidents from becoming liability claims."
+      };
+      var covRows = document.getElementById("coverage-rows");
+      covRows.innerHTML = A.coverages.map(function (c) {
+        return '<div class="cov-row" data-code="' + c.code + '">' +
+          '<button class="cov-head" aria-expanded="false">' +
+            '<span class="code-chip">' + c.code + '</span>' +
+            '<span class="cov-name"><span class="cn-title">' + c.name + '</span>' +
+            '<span class="cn-blurb">' + c.blurb + '</span></span>' +
+            '<span class="cov-amt">' + fmt.currency0(c.amount) + '</span>' +
+            '<span class="cov-caret">' + icon("chevronRight") + '</span>' +
+          '</button>' +
+          '<div class="cov-detail"><div class="cov-detail-inner">' +
+            '<p>' + covExtra[c.code] + '</p>' +
+            '<button class="chip chip-ai" data-ask="Is my ' + c.name.toLowerCase() + ' coverage of ' + fmt.currency0(c.amount) + ' enough for my home?">Is this enough?</button>' +
+          '</div></div>' +
+        '</div>';
+      }).join("");
+      covRows.querySelectorAll(".cov-row").forEach(function (row) {
+        var btn = row.querySelector(".cov-head");
+        btn.addEventListener("click", function () {
+          var open = row.classList.toggle("open");
+          btn.setAttribute("aria-expanded", open ? "true" : "false");
+        });
+      });
+
+      /* ---------- COVERAGE MIX (doughnut + legend) ---------- */
+      var totalLimits = A.coverages.reduce(function (s, c) { return s + c.amount; }, 0);
+      document.getElementById("cov-total").textContent = fmt.currencyShort(totalLimits);
+
+      // group for a readable mix: Dwelling / Contents / Liability / Other
+      var get = function (code) { return A.coverages.find(function (c) { return c.code === code; }).amount; };
+      var mix = [
+        { name: "Dwelling (A)", val: get("A"), key: "brand" },
+        { name: "Personal property (C)", val: get("C"), key: "ai" },
+        { name: "Liability (E)", val: get("E"), key: "info" },
+        // "Other" gets a real categorical (amber) rather than the muted tertiary
+        // text token, so the smallest slice stays legible in both themes.
+        { name: "Other (B·D·F)", val: get("B") + get("D") + get("F"), key: "warning" }
+      ];
+
+      function legendColor(c, key) {
+        return key === "brand" ? c.brand : key === "ai" ? c.ai : key === "info" ? c.info : c.warning;
+      }
+      function renderLegend() {
+        var c = SI.charts.colors();
+        document.getElementById("cov-legend").innerHTML = mix.map(function (m) {
+          return '<div class="cl-item">' +
+            '<span class="cl-swatch" style="background:' + legendColor(c, m.key) + ';"></span>' +
+            '<span class="cl-name">' + m.name + '</span>' +
+            '<span class="cl-val">' + fmt.currency0(m.val) + '</span></div>';
+        }).join("");
+      }
+      renderLegend();
+      window.addEventListener("selfinsure:themechange", function () { setTimeout(renderLegend, 60); });
+
+      SI.charts.doughnut({
+        canvas: "cov-chart",
+        cutout: "72%",
+        data: function (c, rgba) {
+          return {
+            labels: mix.map(function (m) { return m.name; }),
+            datasets: [{
+              data: mix.map(function (m) { return m.val; }),
+              backgroundColor: mix.map(function (m) { return legendColor(c, m.key); }),
+              borderColor: c.surface, borderWidth: 3, hoverOffset: 4
+            }]
+          };
+        },
+        options: function (base, c) {
+          base.plugins.tooltip.callbacks = {
+            label: function (ctx) { return " " + fmt.currency0(ctx.parsed); }
+          };
+          return base;
+        }
+      });
+
+      /* ---------- PROPERTY ---------- */
+      var propRows = [
+        { k: "Property address", v: P.propertyAddress.line1 },
+        { k: "City / State / ZIP", v: P.propertyAddress.city + ", " + P.propertyAddress.state + " " + P.propertyAddress.zip },
+        { k: "Year built", v: P.yearBuilt },
+        { k: "Living area", v: P.squareFeet.toLocaleString("en-US") + " sq ft" },
+        { k: "Construction", v: P.constructionType },
+        { k: "Roof installed", v: P.roofYear },
+        { k: "Occupancy", v: "Primary residence" },
+        { k: "Bound", v: fmt.date(P.boundDate) + " · same-day" }
+      ];
+      document.getElementById("prop-grid").innerHTML = propRows.map(function (r) {
+        return '<div class="prop-kv"><span class="pk-k">' + r.k + '</span><span class="pk-v">' + r.v + '</span></div>';
+      }).join("");
+      document.getElementById("ask-prop").addEventListener("click", function () {
+        SI.assistant.send("My property details look wrong — how do I update the year built or roof year?");
+      });
+
+      /* ---------- RETURN OF PREMIUM ---------- */
+      document.getElementById("rop-amt").textContent = fmt.currency0(R.bronzeReturnAmount);
+      document.getElementById("rop-status").textContent =
+        "Year " + R.policyYear + " of " + R.enrolledTermYears + " · claims-free";
+      document.getElementById("rop-start").textContent = "Year 1 · " + A.member.memberSinceYear;
+      document.getElementById("rop-end").textContent = "Year " + R.enrolledTermYears + " · " + fmt.currency0(R.bronzeReturnAmount);
+      document.getElementById("rop-paid").textContent = fmt.currency0(R.paidIntoTrack);
+      document.getElementById("rop-inside").textContent = fmt.currency0(R.bronzeReturnAmount);
+      setTimeout(function () { document.getElementById("rop-fill").style.width = R.progressPct + "%"; }, 200);
+
+      // tier cards
+      document.getElementById("tier-grid").innerHTML = R.tiers.map(function (t) {
+        var cls = "tier" + (t.current ? " current" : "") + (t.key === "gold" ? " gold" : "");
+        var badge = t.current
+          ? '<span class="pill pill-ai"><span class="dot"></span>Your tier</span>'
+          : '<span class="pill">' + t.status + '</span>';
+        return '<div class="' + cls + '">' +
+          '<div class="tier-top"><span class="tier-name">' + t.name + '</span>' + badge + '</div>' +
+          '<div class="tier-pct">' + t.pct + '%</div>' +
+          '<div class="tier-back">back · up to <strong>' + fmt.currency0(t.returnAmount) + '</strong></div>' +
+          '<div class="tier-term">' + t.termYears + '-year term · claims-free</div>' +
+          '<div class="tier-foot">' +
+            (t.current
+              ? '<span class="tiny ai-text" style="font-weight:600;display:inline-flex;align-items:center;gap:6px;">' + icon("check") + 'Enrolled · ' + R.policyYear + ' of ' + t.termYears + ' years</span>'
+              : '<span class="tiny muted-3">' + t.status + '</span>') +
+          '</div>' +
+        '</div>';
+      }).join("");
+
+      // ROP trajectory chart — a rising "return earned" curve that lands exactly on
+      // the $7,500 target at year 10 (no overshoot). Each claims-free year accrues an
+      // equal share of the Bronze return; "you are here" sits on the curve at Y6.
+      SI.charts.line({
+        canvas: "rop-chart",
+        data: function (c, rgba) {
+          var n = R.enrolledTermYears;
+          var perYear = R.bronzeReturnAmount / n;   // equal accrual toward the return
+          var labels = [], earned = [], target = [];
+          for (var i = 1; i <= n; i++) {
+            labels.push("Y" + i);
+            // accrued only through the current policy year (future years are projected, dashed)
+            earned.push(i <= R.policyYear ? Math.round(perYear * i) : null);
+            target.push(R.bronzeReturnAmount);
+          }
+          // projected continuation from "you are here" to the year-10 target
+          var projected = labels.map(function (_, idx) {
+            var yr = idx + 1;
+            return yr >= R.policyYear ? Math.round(perYear * yr) : null;
+          });
+          return {
+            labels: labels,
+            datasets: [
+              { label: "Return target", data: target, borderColor: rgba(c.brand, 0.55), backgroundColor: "transparent", fill: false, borderDash: [5, 4], borderWidth: 1.5, pointRadius: 0, tension: 0 },
+              { label: "Projected", data: projected, borderColor: rgba(c.ai, 0.45), backgroundColor: "transparent", borderWidth: 2, borderDash: [4, 4], pointRadius: 0, tension: .3 },
+              { label: "Return earned", data: earned, borderColor: c.ai, backgroundColor: c.aiTint, fill: true, borderWidth: 2, tension: .3,
+                pointRadius: earned.map(function (_, i) { return i === (R.policyYear - 1) ? 5 : 0; }),
+                pointBackgroundColor: c.ai, pointBorderColor: c.surface, pointBorderWidth: 2 }
+            ]
+          };
+        },
+        options: function (base, c) {
+          base.scales.y.ticks.callback = function (v) { return "$" + (v / 1000) + "K"; };
+          base.scales.y.suggestedMax = R.bronzeReturnAmount + 1000;
+          base.scales.y.beginAtZero = true;
+          base.plugins.tooltip.callbacks = {
+            label: function (ctx) {
+              if (ctx.parsed.y == null || ctx.dataset.label === "Projected") return null;
+              return " " + ctx.dataset.label + ": " + fmt.currency0(ctx.parsed.y);
+            }
+          };
+          return base;
+        }
+      });
+
+      /* ---------- DEDUCTIBLES ---------- */
+      document.getElementById("ded-allperils").textContent = D.allPerils.label;
+      document.getElementById("ded-windhail").textContent = fmt.currency0(D.windHail.computedAmount);
+      document.getElementById("ded-dw").textContent = fmt.currency0(SI.derived.coverageA);
+      var claim = A.claims[0];
+      document.getElementById("we-gross").textContent = fmt.currency0(claim.grossAmount);
+      document.getElementById("we-ded").textContent = fmt.currency0(claim.deductibleApplied);
+      document.getElementById("we-net").textContent = fmt.currency0(claim.netPayout);
+
+      /* ---------- INLINE ID CARD ---------- */
+      document.getElementById("id-member").textContent = A.member.fullName;
+      document.getElementById("id-policy").textContent = P.number;
+      document.getElementById("id-form").textContent = P.product;
+      document.getElementById("id-term").textContent =
+        fmt.dateShort(P.termStart) + ", " + P.termStart.slice(0, 4) + " – " +
+        fmt.dateShort(P.termEnd) + ", " + P.termEnd.slice(0, 4);
+      // deterministic faux-QR (matches app.js style; cell fill from shared --qr-ink token)
+      (function () {
+        var ink = SI.charts.cssVar("--qr-ink") || "#0c0d10";
+        var cells = "";
+        for (var y = 0; y < 7; y++) for (var x = 0; x < 7; x++) {
+          var on = ((x * 13 + y * 7 + x * y) % 3 === 0) || (x < 2 && y < 2) || (x > 4 && y < 2) || (x < 2 && y > 4);
+          if (on) cells += '<rect x="' + (x * 8) + '" y="' + (y * 8) + '" width="8" height="8" fill="' + ink + '"/>';
+        }
+        document.getElementById("mini-qr").innerHTML = '<svg viewBox="0 0 56 56" width="100%" height="100%">' + cells + '</svg>';
+      })();
+      var miniId = document.getElementById("mini-id");
+      miniId.addEventListener("click", function () { SI.flows.idCard(); });
+      miniId.addEventListener("keydown", function (e) { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); SI.flows.idCard(); } });
+      document.getElementById("open-id-2").addEventListener("click", function () { SI.flows.idCard(); });
+      document.getElementById("btn-id-card").addEventListener("click", function () { SI.flows.idCard(); });
+
+      /* ---------- DOCUMENT LIST + VIEWER ---------- */
+      var policyDocs = A.documents.filter(function (d) { return d.category === "Policy"; });
+      var docList = document.getElementById("doc-list");
+      docList.innerHTML = policyDocs.map(function (d) {
+        return '<div class="doc-row" data-doc="' + d.id + '">' +
+          '<span class="file-glyph">' + icon("doc") + '</span>' +
+          '<div class="dr-body"><div class="dr-name">' + d.name + (d.primary ? ' <span class="pill pill-ai" style="margin-left:6px;"><span class="dot"></span>Primary</span>' : '') + '</div>' +
+          '<div class="dr-meta">' + d.type + ' · ' + d.size + ' · ' + fmt.date(d.date) + '</div></div>' +
+          '<div class="dr-actions">' +
+            '<button class="btn btn-ghost btn-sm" data-view>View</button>' +
+            '<button class="icon-btn" data-dl aria-label="Download ' + d.name + '">' + icon("download") + '</button>' +
+          '</div></div>';
+      }).join("");
+      docList.querySelectorAll(".doc-row").forEach(function (rowEl) {
+        var id = rowEl.getAttribute("data-doc");
+        var doc = policyDocs.find(function (d) { return d.id === id; });
+        rowEl.querySelector("[data-view]").addEventListener("click", function () { openDocViewer(doc); });
+        rowEl.querySelector("[data-dl]").addEventListener("click", function () {
+          SI.flows.downloadText(slug(doc.name) + ".txt", docPlainText(doc));
+          SI.ui.toast("Downloaded " + doc.name + ".");
+        });
+      });
+
+      function slug(s) { return s.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, ""); }
+
+      function docPlainText(doc) {
+        var lines = ["SELF-INSURE — " + doc.name.toUpperCase(), "the insurance that gives it back", "",
+          "Policy: " + P.number, "Member: " + A.member.fullName, "Form: " + P.form,
+          "Term: " + fmt.date(P.termStart) + " – " + fmt.date(P.termEnd),
+          "Property: " + P.propertyAddress.line1 + ", " + P.propertyAddress.city + ", " + P.propertyAddress.state + " " + P.propertyAddress.zip, ""];
+        if (doc.id === "DOC-DEC") {
+          lines.push("COVERAGES");
+          A.coverages.forEach(function (c) { lines.push("  " + c.code + "  " + c.name + ": " + fmt.currency0(c.amount)); });
+          lines.push("", "DEDUCTIBLES", "  All-perils: " + D.allPerils.label, "  Windstorm: " + D.windHail.label,
+            "", "PREMIUM", "  Annual: " + fmt.currency0(A.billing.premiumAnnual) + " (" + fmt.currency0(A.billing.premiumMonthly) + "/mo)");
+        } else if (doc.id === "DOC-ROP") {
+          lines.push("RETURN OF PREMIUM ADDENDUM");
+          R.tiers.forEach(function (t) { lines.push("  " + t.name + " — " + t.pct + "% back · " + t.termYears + "yr · up to " + fmt.currency0(t.returnAmount)); });
+          lines.push("", "Enrolled tier: Bronze (50%)", "Status: Year " + R.policyYear + " of " + R.enrolledTermYears + " · claims-free · on track for " + fmt.currency0(R.bronzeReturnAmount));
+        } else {
+          lines.push("HO-3 (Special Form) policy contract.", "This facsimile is generated for demonstration from your live account data.");
+        }
+        lines.push("", "Status: ACTIVE", "Document ID: " + doc.id);
+        return lines.join("\n");
+      }
+
+      function openDocViewer(doc) {
+        var bodyInner;
+        if (doc.id === "DOC-DEC") {
+          bodyInner =
+            '<h4>Named insured &amp; policy</h4>' +
+            '<dl class="fx-kv">' +
+              '<dt>Named insured</dt><dd>' + A.member.fullName + '</dd>' +
+              '<dt>Policy number</dt><dd>' + P.number + '</dd>' +
+              '<dt>Form</dt><dd>' + P.form + '</dd>' +
+              '<dt>Policy period</dt><dd>' + fmt.date(P.termStart) + ' – ' + fmt.date(P.termEnd) + '</dd>' +
+              '<dt>Insured property</dt><dd>' + P.propertyAddress.line1 + ', ' + P.propertyAddress.city + ', ' + P.propertyAddress.state + ' ' + P.propertyAddress.zip + '</dd>' +
+            '</dl>' +
+            '<h4>Coverages &amp; limits</h4>' +
+            '<table class="fx-tbl"><thead><tr><th>Code</th><th>Coverage</th><th style="text-align:right;">Limit</th></tr></thead><tbody>' +
+            A.coverages.map(function (c) { return '<tr><td>' + c.code + '</td><td>' + c.name + '</td><td class="num">' + fmt.currency0(c.amount) + '</td></tr>'; }).join("") +
+            '</tbody></table>' +
+            '<h4>Deductibles</h4>' +
+            '<dl class="fx-kv"><dt>All perils</dt><dd>' + D.allPerils.label + '</dd>' +
+            '<dt>Windstorm</dt><dd>' + D.windHail.label + '</dd></dl>' +
+            '<h4>Premium</h4>' +
+            '<dl class="fx-kv"><dt>Annual premium</dt><dd>' + fmt.currency0(A.billing.premiumAnnual) + '</dd>' +
+            '<dt>Billed</dt><dd>' + fmt.currency0(A.billing.premiumMonthly) + ' / month · autopay</dd></dl>';
+        } else if (doc.id === "DOC-ROP") {
+          bodyInner =
+            '<h4>Return-of-Premium addendum</h4>' +
+            '<p style="font-size:12.5px;color:#5b5b57;margin:0 0 12px;line-height:1.55;">Stay claims-free through your term and a share of the premiums you paid is returned to you. This addendum forms part of policy ' + P.number + '.</p>' +
+            '<table class="fx-tbl"><thead><tr><th>Tier</th><th>Term</th><th>Back</th><th style="text-align:right;">Up to</th></tr></thead><tbody>' +
+            R.tiers.map(function (t) { return '<tr><td>' + t.name + (t.current ? ' (enrolled)' : '') + '</td><td>' + t.termYears + ' yr</td><td>' + t.pct + '%</td><td class="num">' + fmt.currency0(t.returnAmount) + '</td></tr>'; }).join("") +
+            '</tbody></table>' +
+            '<h4>Your status</h4>' +
+            '<dl class="fx-kv"><dt>Enrolled tier</dt><dd>Bronze · 50%</dd>' +
+            '<dt>Policy year</dt><dd>' + R.policyYear + ' of ' + R.enrolledTermYears + '</dd>' +
+            '<dt>Standing</dt><dd>Claims-free · on track</dd>' +
+            '<dt>Projected return</dt><dd>' + fmt.currency0(R.bronzeReturnAmount) + ' at year ' + R.enrolledTermYears + ' (' + fmt.date(R.bronzeReturnDate) + ')</dd></dl>';
+        } else {
+          bodyInner =
+            '<h4>HO-3 homeowners policy contract</h4>' +
+            '<p style="font-size:12.5px;color:#5b5b57;margin:0 0 12px;line-height:1.6;">This Special Form contract sets out the agreement between ' + A.member.fullName + ' and Self-Insure for policy ' + P.number + '. It covers your dwelling and other structures against all risks of direct physical loss except those specifically excluded, and your personal property against named perils.</p>' +
+            '<dl class="fx-kv">' +
+              '<dt>Section I</dt><dd>Property coverages A–D</dd>' +
+              '<dt>Section II</dt><dd>Liability coverages E–F</dd>' +
+              '<dt>Conditions</dt><dd>Duties after loss, appraisal, our option</dd>' +
+              '<dt>Endorsements</dt><dd>Return-of-Premium addendum (Bronze)</dd>' +
+            '</dl>' +
+            '<p style="font-size:11.5px;color:#8a8a85;margin-top:14px;">Full contract language continues across 24 pages. This facsimile renders the cover sheet for demonstration.</p>';
+        }
+
+        var node = document.createElement("div");
+        node.innerHTML =
+          '<div class="modal-head"><div class="modal-title">' + doc.name + '</div>' +
+          '<button class="modal-close" data-close aria-label="Close">' + icon("x") + '</button></div>' +
+          '<div class="modal-body" style="background:var(--surface-2);">' +
+            '<div class="facsimile">' +
+              '<div class="fx-head"><div><div class="fx-brand">Self-Insure</div><div class="fx-tag">the insurance that gives it back</div></div>' +
+              '<div><div class="fx-doctype">' + doc.name + '</div><div class="fx-sub">' + doc.type + ' · ' + fmt.date(doc.date) + '</div></div></div>' +
+              bodyInner +
+              '<span class="fx-stamp">Active · ' + P.number + '</span>' +
+              '<div class="fx-foot">This page is a demonstration facsimile generated from live account data. It is not a legal document. Self-Insure · Ohio &amp; Wisconsin · Document ' + doc.id + '.</div>' +
+            '</div>' +
+          '</div>' +
+          '<div class="modal-foot"><button class="btn btn-ghost" data-close>Close</button>' +
+          '<button class="btn btn-primary" data-dl>' + icon("download") + 'Download</button></div>';
+        var m = SI.ui.openModal(node, { wide: true });
+        m.querySelector("[data-dl]").addEventListener("click", function () {
+          SI.flows.downloadText(slug(doc.name) + ".txt", docPlainText(doc));
+          SI.ui.toast("Downloaded " + doc.name + ".");
+        });
+      }
+
+      // header "Declarations" button → open the dec viewer
+      document.getElementById("btn-dl-dec").addEventListener("click", function () {
+        openDocViewer(A.documents.find(function (d) { return d.id === "DOC-DEC"; }));
+      });
+
+      /* ---------- ADJUST COVERAGE MODAL ---------- */
+      document.getElementById("btn-adjust").addEventListener("click", openAdjust);
+      function openAdjust() {
+        var base = SI.derived.coverageA;
+        var node = document.createElement("div");
+        node.innerHTML =
+          '<div class="modal-head"><div class="modal-title">Adjust coverage</div>' +
+          '<button class="modal-close" data-close aria-label="Close">' + icon("x") + '</button></div>' +
+          '<div class="modal-body">' +
+            '<div class="field"><label for="adj-dw">Dwelling coverage (A)</label>' +
+            '<input class="range" id="adj-dw" type="range" min="300000" max="650000" step="10000" value="' + base + '" />' +
+            '<div style="display:flex;justify-content:space-between;align-items:baseline;margin-top:8px;">' +
+              '<span class="num" id="adj-dw-val" style="font-size:22px;">' + fmt.currency0(base) + '</span>' +
+              '<span class="tiny muted-3">Other structures, contents &amp; loss of use scale with this.</span>' +
+            '</div></div>' +
+            '<div class="field"><div class="label" style="margin-bottom:8px;">All-perils deductible</div>' +
+            '<div class="segmented" id="adj-ded">' +
+              '<button type="button" data-d="1000">$1,000</button>' +
+              '<button type="button" data-d="1500" class="active">$1,500</button>' +
+              '<button type="button" data-d="2500">$2,500</button>' +
+            '</div></div>' +
+            '<div class="card pad-sm" style="background:var(--surface-2);box-shadow:none;margin-top:6px;">' +
+              '<div style="display:flex;justify-content:space-between;align-items:center;">' +
+                '<div><div class="tiny muted">Indicative premium <span class="pill pill-ai" style="margin-left:4px;height:18px;padding:0 7px;font-size:10px;"><span class="dot"></span>AI re-rates on request</span></div>' +
+                '<div class="num ai" id="adj-prem" style="font-size:26px;">' + fmt.currency0(A.billing.premiumAnnual) + '<span style="font-size:13px;color:var(--text-3);">/yr</span></div></div>' +
+                '<div style="text-align:right;"><div class="tiny muted">vs current</div><div id="adj-delta" class="tiny" style="font-weight:600;color:var(--text-2);">no change</div></div>' +
+              '</div>' +
+            '</div>' +
+            '<p class="tiny muted-3" style="margin-top:12px;">This is an indicative figure — our model re-rates the exact premium against your full risk profile when you request the change. Nothing changes on your policy until you confirm, usually within one business day.</p>' +
+          '</div>' +
+          '<div class="modal-foot"><button class="btn btn-ghost" data-close>Cancel</button>' +
+          '<button class="btn btn-primary" data-request>Request change</button></div>';
+        var m = SI.ui.openModal(node);
+
+        var dwInput = m.querySelector("#adj-dw");
+        var dwVal = m.querySelector("#adj-dw-val");
+        var premEl = m.querySelector("#adj-prem");
+        var deltaEl = m.querySelector("#adj-delta");
+        var dedBtns = m.querySelectorAll("#adj-ded button");
+        var curDed = 1500;
+
+        function recalc() {
+          var dw = parseInt(dwInput.value, 10);
+          // Indicative, mildly non-linear model: premium scales super-linearly with
+          // the dwelling limit (rebuild cost / risk rises faster than coverage), and
+          // the deductible applies as a multiplicative factor — not a flat add — so
+          // the full 300k–650k range moves the figure by a believable amount.
+          var dedFactor = curDed === 1000 ? 1.07 : curDed === 2500 ? 0.91 : 1.00;
+          var prem = A.billing.premiumAnnual * Math.pow(dw / base, 1.25) * dedFactor;
+          prem = Math.round(prem / 5) * 5;   // round to nearest $5 for a clean quote
+          dwVal.textContent = fmt.currency0(dw);
+          premEl.innerHTML = fmt.currency0(prem) + '<span style="font-size:13px;color:var(--text-3);">/yr</span>';
+          var d = prem - A.billing.premiumAnnual;
+          if (d === 0) { deltaEl.textContent = "no change"; deltaEl.style.color = "var(--text-2)"; }
+          else if (d > 0) { deltaEl.textContent = "+" + fmt.currency0(d) + "/yr"; deltaEl.style.color = "var(--warning)"; }
+          else { deltaEl.textContent = "−" + fmt.currency0(Math.abs(d)) + "/yr"; deltaEl.style.color = "var(--ai)"; }
+        }
+        dwInput.addEventListener("input", recalc);
+        dedBtns.forEach(function (b) {
+          b.addEventListener("click", function () {
+            dedBtns.forEach(function (x) { x.classList.remove("active"); });
+            b.classList.add("active"); curDed = parseInt(b.getAttribute("data-d"), 10); recalc();
+          });
+        });
+        recalc();
+
+        m.querySelector("[data-request]").addEventListener("click", function (e) {
+          var btn = e.currentTarget;
+          btn.innerHTML = '<span class="spinner"></span>Submitting…'; btn.disabled = true;
+          setTimeout(function () {
+            var dw = parseInt(dwInput.value, 10);
+            SI.state.addActivity({
+              id: "ACT-" + Date.now(), icon: "doc", tone: "info", date: "2026-06-24", time: nowTime(),
+              title: "Coverage change requested",
+              body: "Dwelling " + fmt.currency0(dw) + " · $" + curDed.toLocaleString() + " deductible. Pending review.",
+              link: "policy.html", unread: true
+            });
+            SI.ui.closeModal();
+            SI.ui.toast("Our team will confirm your coverage change within one business day.", "ai", { title: "Change request received" });
+          }, 1100);
+        });
+      }
+      function nowTime() {
+        var d = new Date(), h = d.getHours(), mm = ("0" + d.getMinutes()).slice(-2);
+        var ap = h >= 12 ? "PM" : "AM"; h = h % 12 || 12; return h + ":" + mm + " " + ap;
+      }
+
+      /* ---------- ASSISTANT CHIPS (data-ask) ---------- */
+      document.querySelectorAll("[data-ask]").forEach(function (b) {
+        b.addEventListener("click", function () { SI.assistant.send(b.getAttribute("data-ask")); });
+      });
+
+      /* ---------- STICKY TAB NAV (scroll-spy + smooth scroll) ---------- */
+      var tabs = Array.prototype.slice.call(document.querySelectorAll(".pol-tab"));
+      var sections = tabs.map(function (t) { return document.getElementById(t.getAttribute("data-tab")); });
+      tabs.forEach(function (t) {
+        t.addEventListener("click", function () {
+          var target = document.getElementById(t.getAttribute("data-tab"));
+          if (target) target.scrollIntoView({ behavior: "smooth", block: "start" });
+        });
+      });
+      function setActive(id) {
+        tabs.forEach(function (t) { t.classList.toggle("active", t.getAttribute("data-tab") === id); });
+      }
+      var spy;
+      if ("IntersectionObserver" in window) {
+        spy = new IntersectionObserver(function (entries) {
+          entries.forEach(function (en) { if (en.isIntersecting) setActive(en.target.id); });
+        }, { rootMargin: "-45% 0px -50% 0px", threshold: 0 });
+        sections.forEach(function (s) { if (s) spy.observe(s); });
+      }
+
+      /* ---------- DEEP LINK (#rop etc.) ---------- */
+      if (location.hash) {
+        var hid = location.hash.slice(1);
+        var hel = document.getElementById(hid);
+        if (hel) setTimeout(function () { hel.scrollIntoView({ behavior: "smooth", block: "start" }); setActive(hid); }, 240);
+      }
+    });
+  </script>
+</body>
+</html>
