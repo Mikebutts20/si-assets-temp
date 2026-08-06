@@ -1,0 +1,763 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AI underwriting · Self-Insure</title>
+  <script src="theme.js"></script>
+  <link rel="stylesheet" href="styles.css" />
+  <style>
+    /* ===== Scoped to underwriting.html — composed from the kit's primitives ===== */
+    .uw-stage { max-width: 880px; margin: 0 auto; }
+
+    /* Phase header / progress meter across the three phases */
+    .uw-top { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 22px; flex-wrap: wrap; }
+    .uw-phasebar { display: flex; align-items: center; gap: 0; flex: 1; min-width: 260px; }
+    .uw-phase { flex: 1 1 0; display: flex; align-items: center; gap: 9px; font-size: 12px; font-weight: 600; color: var(--text-3); position: relative; }
+    .uw-phase .pnum { width: 22px; height: 22px; flex: 0 0 22px; border-radius: 50%; border: 1.5px solid var(--border); display: grid; place-items: center; font-size: 11px; font-weight: 700; color: var(--text-3); background: var(--surface); transition: all .35s var(--ease); }
+    .uw-phase .pnum svg { width: 12px; height: 12px; }
+    .uw-phase::after { content: ""; flex: 1; height: 2px; background: var(--border); border-radius: 2px; margin-left: 4px; transition: background .4s var(--ease); }
+    .uw-phase:last-child::after { display: none; }
+    .uw-phase.active { color: var(--text); }
+    .uw-phase.active .pnum { border-color: var(--ai); color: var(--ai); box-shadow: 0 0 0 4px var(--ai-tint); }
+    .uw-phase.done { color: var(--text); }
+    .uw-phase.done .pnum { background: var(--ai); border-color: var(--ai); color: var(--ai-ink); }
+    .uw-phase.done::after { background: var(--ai); }
+
+    .uw-skip { background: transparent; border: 0; color: var(--text-3); font-size: 12.5px; font-weight: 600; padding: 7px 10px; border-radius: 8px; display: inline-flex; align-items: center; gap: 5px; }
+    .uw-skip:hover { color: var(--text); background: var(--surface-2); }
+    .uw-skip svg { width: 14px; height: 14px; }
+
+    /* The animated card that performs the work */
+    .uw-runner { position: relative; overflow: hidden; }
+    .uw-runner-grid { display: grid; grid-template-columns: 300px 1fr; gap: 8px 28px; align-items: center; }
+    @media (max-width: 720px) { .uw-runner-grid { grid-template-columns: 1fr; } }
+
+    .uw-caption { font-size: 12px; font-weight: 600; color: var(--ai); letter-spacing: .04em; text-transform: uppercase; display: inline-flex; align-items: center; gap: 7px; margin-bottom: 10px; }
+    .uw-caption .lv { display: inline-flex; gap: 3px; }
+    .uw-caption .lv i { width: 4px; height: 4px; border-radius: 50%; background: var(--ai); display: inline-block; animation: uw-blink 1.1s var(--ease) infinite; }
+    .uw-caption .lv i:nth-child(2) { animation-delay: .18s; }
+    .uw-caption .lv i:nth-child(3) { animation-delay: .36s; }
+    @keyframes uw-blink { 0%,100% { opacity: .25; } 50% { opacity: 1; } }
+
+    .uw-headline { font-family: var(--font-display); font-size: 26px; font-weight: 500; color: var(--text); letter-spacing: -0.01em; line-height: 1.15; }
+    .uw-sub { font-size: 13px; color: var(--text-2); margin-top: 4px; }
+
+    /* metrics row under the orbit/reasoning */
+    .uw-metrics { display: flex; gap: 26px; margin-top: 18px; flex-wrap: wrap; }
+    .uw-metric .m-val { font-family: var(--font-display); font-size: 30px; font-weight: 500; color: var(--brand); line-height: 1; font-variant-numeric: tabular-nums; }
+    .uw-metric .m-val.ai { color: var(--ai); }
+    .uw-metric .m-lab { font-size: 11.5px; color: var(--text-2); margin-top: 4px; }
+
+    /* Phase 1 — data sources checklist */
+    .uw-sources { display: grid; gap: 7px; }
+    .uw-source { display: flex; align-items: center; gap: 11px; padding: 9px 12px; border-radius: 10px; background: var(--surface-2); border: 1px solid var(--border-2); opacity: .42; transform: translateY(3px); transition: opacity .35s var(--ease), transform .35s var(--ease), border-color .35s; }
+    .uw-source.lit { opacity: 1; transform: none; border-color: var(--border); }
+    .uw-source .s-ico { width: 28px; height: 28px; flex: 0 0 28px; border-radius: 8px; display: grid; place-items: center; background: var(--surface); border: 1px solid var(--border); color: var(--text-2); transition: all .35s var(--ease); }
+    .uw-source .s-ico svg { width: 15px; height: 15px; }
+    .uw-source.lit .s-ico { background: var(--ai-tint); border-color: var(--ai-border); color: var(--ai); }
+    .uw-source .s-name { flex: 1; min-width: 0; font-size: 13px; font-weight: 500; color: var(--text); }
+    .uw-source .s-state { font-size: 11.5px; color: var(--text-3); display: inline-flex; align-items: center; gap: 5px; font-variant-numeric: tabular-nums; }
+    .uw-source.lit .s-state { color: var(--ai); }
+    .uw-source .s-check { width: 15px; height: 15px; opacity: 0; transition: opacity .3s var(--ease); color: var(--ai); }
+    .uw-source.lit .s-check { opacity: 1; }
+    .uw-source .s-spin { width: 13px; height: 13px; border-radius: 50%; border: 2px solid var(--ai-border); border-top-color: var(--ai); animation: spin .7s linear infinite; }
+
+    /* orbit nodes — positioned by JS via --a (angle) and --r (radius) */
+    .orbit .ring.r2 { inset: 38px; }
+    .orbit .ring.r3 { inset: 76px; }
+    .orbit .node { left: 50%; top: 50%; margin: -5.5px 0 0 -5.5px; transform: rotate(var(--a)) translateX(var(--r)) rotate(calc(-1 * var(--a))); }
+    .orbit .core { font-family: var(--font-display); }
+    .orbit .core svg { width: 26px; height: 26px; }
+    .orbit .sweep { position: absolute; inset: 0; border-radius: 50%; background: conic-gradient(from 0deg, transparent 0deg, var(--ai-tint) 40deg, transparent 80deg); animation: spin 2.6s linear infinite; opacity: 0; transition: opacity .4s; }
+    .orbit.scanning .sweep { opacity: 1; }
+
+    /* Phase 2 — reasoning stream */
+    .uw-reason { display: flex; flex-direction: column; gap: 8px; min-height: 168px; }
+    .uw-rline { display: flex; align-items: flex-start; gap: 9px; font-size: 13px; color: var(--text); opacity: 0; transform: translateY(4px); transition: opacity .3s var(--ease), transform .3s var(--ease); }
+    .uw-rline.in { opacity: 1; transform: none; }
+    .uw-rline .r-ico { width: 18px; height: 18px; flex: 0 0 18px; border-radius: 50%; display: grid; place-items: center; background: var(--ai-tint); color: var(--ai); margin-top: 1px; }
+    .uw-rline .r-ico svg { width: 11px; height: 11px; }
+    .uw-rline .r-txt { line-height: 1.4; }
+    .uw-rline .r-txt b { color: var(--text); font-weight: 600; }
+
+    /* confidence block */
+    .uw-conf { margin-top: 18px; }
+    .uw-conf-top { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 7px; }
+    .uw-conf-lab { font-size: 12px; color: var(--text-2); font-weight: 500; }
+    .uw-conf-val { font-family: var(--font-display); font-size: 18px; font-weight: 500; color: var(--ai); font-variant-numeric: tabular-nums; }
+
+    /* Phase 3 — decision reveal */
+    .uw-decision { text-align: center; opacity: 0; transform: translateY(8px); transition: opacity .5s var(--ease), transform .5s var(--ease); }
+    .uw-decision.in { opacity: 1; transform: none; }
+    .uw-bigcheck { width: 84px; height: 84px; margin: 4px auto 18px; border-radius: 50%; background: var(--ai); color: var(--ai-ink); display: grid; place-items: center; box-shadow: 0 0 0 0 var(--ai-glow); animation: uw-pop .55s var(--ease) both, uw-halo 2.6s var(--ease) .55s infinite; }
+    .uw-bigcheck svg { width: 42px; height: 42px; }
+    @keyframes uw-pop { 0% { transform: scale(.4); opacity: 0; } 60% { transform: scale(1.08); } 100% { transform: scale(1); opacity: 1; } }
+    @keyframes uw-halo { 0%,100% { box-shadow: 0 0 0 0 var(--ai-glow); } 50% { box-shadow: 0 0 0 14px transparent; } }
+    .uw-approved { font-family: var(--font-display); font-size: 40px; font-weight: 600; color: var(--text); letter-spacing: -0.02em; line-height: 1; }
+    .uw-approved-sub { font-size: 14px; color: var(--text-2); margin-top: 8px; }
+
+    .uw-quote { display: grid; grid-template-columns: 1.1fr 1fr; gap: 16px; margin-top: 26px; text-align: left; }
+    @media (max-width: 720px) { .uw-quote { grid-template-columns: 1fr; } }
+    .uw-premium-fig { font-family: var(--font-display); font-size: 46px; font-weight: 500; color: var(--brand); letter-spacing: -0.02em; line-height: 1; font-variant-numeric: tabular-nums; }
+    /* In light mode --brand is near-black and reads dull beside the mint pill/check;
+       this is the underwriting SUCCESS moment, so the premium takes the --ai accent
+       (and a touch more weight) on white. Dark mode keeps the warm gold. */
+    [data-theme="light"] .uw-premium-fig { color: var(--ai); font-weight: 600; }
+    .uw-premium-per { font-size: 13.5px; color: var(--text-2); margin-top: 6px; }
+
+    .uw-cov { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 18px; }
+    .uw-cov .cv { display: flex; align-items: center; gap: 8px; }
+    .uw-cov .cv .num { font-size: 13px; margin-left: auto; }
+    .uw-cov .cv .cn { font-size: 12.5px; color: var(--text-2); }
+
+    .uw-aside { display: flex; align-items: flex-start; gap: 11px; margin-top: 22px; padding: 13px 15px; border-radius: var(--r-card); background: var(--surface-2); border: 1px solid var(--border); text-align: left; }
+    .uw-aside .a-ico { width: 26px; height: 26px; flex: 0 0 26px; border-radius: 7px; display: grid; place-items: center; background: var(--info-tint); color: var(--info); }
+    .uw-aside .a-ico svg { width: 15px; height: 15px; }
+    .uw-aside .a-txt { font-size: 12.5px; color: var(--text-2); line-height: 1.5; }
+    .uw-aside .a-txt b { color: var(--text); font-weight: 600; }
+
+    .uw-cta { display: flex; gap: 12px; justify-content: center; margin-top: 26px; flex-wrap: wrap; }
+
+    /* the inline review expander — animates open, but never clips its 12 rows at
+       large font sizes / browser zoom: a generous cap plus overflow:auto as a
+       safety valve so the bottom rows stay reachable. */
+    .uw-review { max-height: 0; overflow: hidden; transition: max-height .4s var(--ease); text-align: left; }
+    .uw-review.open { max-height: 1200px; overflow-y: auto; }
+
+    /* binding overlay */
+    .uw-bind { position: absolute; inset: 0; background: var(--surface); display: grid; place-items: center; gap: 0; opacity: 0; pointer-events: none; transition: opacity .35s var(--ease); z-index: 4; border-radius: var(--r-card); }
+    .uw-bind.show { opacity: 1; pointer-events: auto; }
+    .uw-bind-inner { text-align: center; }
+    .uw-bind .bb-ring { width: 64px; height: 64px; margin: 0 auto 16px; border-radius: 50%; border: 3px solid var(--ai-border); border-top-color: var(--ai); animation: spin .8s linear infinite; }
+    .uw-bind.done .bb-ring { border: 0; background: var(--ai); color: var(--ai-ink); display: grid; place-items: center; animation: uw-pop .5s var(--ease) both; }
+    .uw-bind.done .bb-ring::after { content: ""; }
+    .uw-bind .bb-title { font-family: var(--font-display); font-size: 22px; font-weight: 500; color: var(--text); }
+    .uw-bind .bb-sub { font-size: 13px; color: var(--text-2); margin-top: 5px; }
+
+    .uw-trust { display: flex; align-items: center; justify-content: center; gap: 18px; margin-top: 20px; flex-wrap: wrap; color: var(--text-3); font-size: 12px; }
+    .uw-trust span { display: inline-flex; align-items: center; gap: 6px; }
+    .uw-trust svg { width: 14px; height: 14px; color: var(--ai); }
+
+    @media (prefers-reduced-motion: reduce) {
+      .orbit .sweep, .uw-bigcheck, .uw-source, .uw-rline, .uw-decision { animation: none !important; transition: none !important; }
+    }
+  </style>
+  <link rel="icon" type="image/svg+xml" href="favicon.svg">
+</head>
+<body>
+  <div data-content data-wide data-shell="minimal">
+
+    <!-- Eyebrow + applicant context -->
+    <div class="uw-stage">
+      <div class="section" style="margin-bottom:16px;">
+        <div class="eyebrow" style="color:var(--ai);margin-bottom:6px;">Self-Insure · AI underwriting</div>
+        <h2 class="display" style="font-size:26px;">Underwriting your home in real time.</h2>
+        <p class="muted" style="margin-top:4px;font-size:13.5px;">
+          <span id="uw-addr">a Columbus, OH home</span> · HO-3 homeowners · same-day decision
+        </p>
+      </div>
+
+      <!-- Phase progress + skip -->
+      <div class="uw-top">
+        <div class="uw-phasebar" aria-hidden="true">
+          <div class="uw-phase" id="ph-1"><span class="pnum">1</span><span>Aggregate data</span></div>
+          <div class="uw-phase" id="ph-2"><span class="pnum">2</span><span>AI underwriting</span></div>
+          <div class="uw-phase" id="ph-3"><span class="pnum">3</span><span>Decision</span></div>
+        </div>
+        <button class="uw-skip" id="uw-skip" type="button">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 4l10 8-10 8zM19 5v14"/></svg>
+          Skip animation
+        </button>
+      </div>
+
+      <!-- The runner card (phases 1 + 2 perform here) -->
+      <div class="card pad-lg uw-runner" id="uw-runner">
+        <div class="uw-runner-grid">
+          <!-- LEFT: orbit -->
+          <div>
+            <div class="orbit" id="uw-orbit">
+              <div class="sweep"></div>
+              <div class="ring r2"></div>
+              <div class="ring r3"></div>
+              <div class="core" id="uw-core">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l1.6 4.6L18 9l-4.4 1.4L12 15l-1.6-4.6L6 9l4.4-1.4z"/><path d="M19 14l.8 2.2L22 17l-2.2.8L19 20l-.8-2.2L16 17l2.2-.8z"/></svg>
+              </div>
+              <!-- nodes injected by JS -->
+            </div>
+          </div>
+
+          <!-- RIGHT: live readout (swaps between phase 1 + phase 2 content) -->
+          <div>
+            <div class="uw-caption" id="uw-cap">
+              <span id="uw-cap-txt">Aggregating data sources</span>
+              <span class="lv"><i></i><i></i><i></i></span>
+            </div>
+
+            <!-- Phase 1: data sources -->
+            <div id="uw-p1">
+              <div class="uw-sources" id="uw-sources"></div>
+            </div>
+
+            <!-- Phase 2: reasoning (hidden until phase 2) -->
+            <div id="uw-p2" class="hidden">
+              <div class="uw-reason" id="uw-reason"></div>
+              <div class="uw-conf">
+                <div class="uw-conf-top">
+                  <span class="uw-conf-lab">Model confidence</span>
+                  <span class="uw-conf-val" id="uw-conf-val">0%</span>
+                </div>
+                <div class="confidence-meter"><div class="cm-fill" id="uw-conf-fill"></div></div>
+              </div>
+            </div>
+
+            <!-- shared metrics row -->
+            <div class="uw-metrics">
+              <div class="uw-metric">
+                <div class="m-val ai" id="uw-points">0</div>
+                <div class="m-lab">data points aggregated</div>
+              </div>
+              <div class="uw-metric">
+                <div class="m-val" id="uw-elapsed">0.0s</div>
+                <div class="m-lab">elapsed</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Binding overlay -->
+        <div class="uw-bind" id="uw-bind">
+          <div class="uw-bind-inner">
+            <div class="bb-ring" id="uw-bind-ring"></div>
+            <div class="bb-title" id="uw-bind-title">Binding your policy…</div>
+            <div class="bb-sub" id="uw-bind-sub">Issuing coverage and activating same-day.</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Phase 3: decision (revealed after phase 2) -->
+      <div class="card pad-lg uw-decision hidden" id="uw-decision" style="margin-top:18px;">
+        <div class="uw-bigcheck" id="uw-bigcheck">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>
+        </div>
+        <div class="uw-approved" id="uw-approved">Approved.</div>
+        <div class="uw-approved-sub" id="uw-approved-sub">Your home is a clean, well-maintained risk — bound same day.</div>
+
+        <div class="uw-quote">
+          <!-- premium -->
+          <div class="card card-ai-tint pad-lg" style="display:flex;flex-direction:column;justify-content:center;">
+            <div class="eyebrow" style="color:var(--ai);margin-bottom:8px;">Your quoted premium</div>
+            <div class="uw-premium-fig"><span id="uw-prem-yr">—</span> <span style="font-size:20px;color:var(--text-2);font-family:var(--font-ui);font-weight:500;">/ yr</span></div>
+            <div class="uw-premium-per"><span id="uw-prem-mo">—</span> / month · billed monthly · autopay-ready</div>
+            <div class="chip-row" style="margin-top:14px;">
+              <span class="pill pill-ai"><span class="dot"></span><span id="uw-conf-pill">Confidence</span></span>
+              <span class="pill pill-brand" id="uw-rop-pill">Return of Premium</span>
+            </div>
+          </div>
+
+          <!-- coverage summary -->
+          <div class="card pad-lg">
+            <div class="card-head" style="margin-bottom:12px;">
+              <div class="card-title">Coverage included</div>
+              <span class="pill pill-ai"><span class="dot"></span>HO-3</span>
+            </div>
+            <div class="uw-cov" id="uw-cov"></div>
+            <div class="divider" style="margin:14px 0;"></div>
+            <div style="display:flex;align-items:center;justify-content:space-between;">
+              <span class="cn" style="font-size:12.5px;color:var(--text-2);">All-perils deductible</span>
+              <span class="num" style="font-size:14px;" id="uw-ded">—</span>
+            </div>
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-top:6px;">
+              <span class="cn" style="font-size:12.5px;color:var(--text-2);">Windstorm deductible</span>
+              <span class="num" style="font-size:14px;" id="uw-wh">—</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Honest calibration aside -->
+        <div class="uw-aside">
+          <span class="a-ico">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 16v-4M12 8h.01"/></svg>
+          </span>
+          <div class="a-txt" id="uw-aside-txt">
+            <b>Most applicants are approved instantly.</b> A small share of risks are referred to a human underwriter — that calibration is how the model stays honest. <b>Yours wasn't referred</b> — you're approved and ready to bind.
+          </div>
+        </div>
+
+        <!-- CTAs -->
+        <div class="uw-cta">
+          <button class="btn btn-primary btn-lg" id="uw-bind-btn">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>
+            Accept &amp; bind policy
+          </button>
+          <button class="btn btn-ghost btn-lg" id="uw-review-btn">Review coverage</button>
+        </div>
+
+        <!-- Inline review expander -->
+        <div class="uw-review" id="uw-review">
+          <div class="card pad-lg" style="margin-top:20px;background:var(--surface-2);box-shadow:none;">
+            <div class="card-title" style="margin-bottom:14px;">Full quote summary</div>
+            <dl class="kv" id="uw-review-kv"></dl>
+            <p class="tiny muted-3" style="margin-top:16px;line-height:1.5;">
+              This is a demo quote. Accepting binds the policy in this session and takes you to your dashboard as an active member — exactly the experience a real applicant gets.
+            </p>
+          </div>
+        </div>
+
+        <div class="uw-trust">
+          <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>Data aggregated in under 3 seconds</span>
+          <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>Underwritten in under 30 seconds</span>
+          <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>Bound same day</span>
+        </div>
+      </div>
+
+      <p class="tiny muted-3 center" style="margin-top:18px;">
+        8% expense ratio vs. 25–30% industry — that efficiency is what funds your return of premium.
+      </p>
+    </div>
+
+  </div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+  <script src="account.js"></script>
+  <script src="intents.js"></script>
+  <script src="app.js"></script>
+  <script>
+  document.addEventListener("selfinsure:ready", function () {
+    var A = SI.account, fmt = SI.fmt, icon = SI.icon;
+
+    /* ---------------------------------------------------------------------
+       Load (or seed) the quote draft. Robust whether arrived from intake
+       or opened directly — falls back to SI.quoteDraftDefault.
+       --------------------------------------------------------------------- */
+    var draft;
+    try { draft = JSON.parse(sessionStorage.getItem("si-quote-draft")); } catch (e) { draft = null; }
+    if (!draft || !draft.property) {
+      draft = JSON.parse(JSON.stringify(SI.quoteDraftDefault));
+    }
+    draft.quote = draft.quote || {};
+
+    function clamp(n, lo, hi) { return Math.max(lo, Math.min(hi, n)); }
+    var NOW_YEAR = 2026; // demo "now"
+
+    /* Coverage selections from the draft. */
+    var dwelling = (draft.coverageSelections && draft.coverageSelections.dwelling) || 400000;
+    var deductible = (draft.coverageSelections && draft.coverageSelections.deductible) || 1500;
+    var ropTier = (draft.coverageSelections && draft.coverageSelections.ropTier) || "bronze";
+
+    /* Property facts derived FROM THE DRAFT (not Eleanor's home), so the data the
+       AI "aggregates" and reasons over matches the house actually being quoted. */
+    var prop = draft.property || {};
+    var yearBuilt = +prop.yearBuilt || 1998;
+    var squareFeet = +prop.squareFeet || 2000;
+    var roofYear = +prop.roofYear || 2018;
+    var roofAge = Math.max(0, NOW_YEAR - roofYear);
+    var constructionType = prop.constructionType || "Frame";
+    var stories = +prop.stories || 2;
+    var addrTxt = (prop.line1 ? prop.line1 + ", " : "") + (prop.city || "Columbus") + ", " + (prop.state || "OH");
+    document.getElementById("uw-addr").textContent = addrTxt;
+
+    /* ---------------------------------------------------------------------
+       Premium — mirrors intake.html's recalcPremium() so the two screens
+       agree, but with a tighter upper clamp so the demo never drifts far above
+       the ~$1,500/yr brand promise. The number SHOWN is always the real one.
+       --------------------------------------------------------------------- */
+    function recalcPremium() {
+      var base = 1500;
+      var dwellingDelta = (dwelling - 400000) / 1000 * 1.8;
+      var dedAdj = deductible === 1000 ? 90 : deductible === 2500 ? -120 : 0;
+      var roofAdj = roofAge > 20 ? 110 : roofAge > 12 ? 45 : 0;
+      var constructionAdj = (constructionType === "Masonry" || constructionType === "Brick") ? -55 : 0;
+      var p = base + dwellingDelta + dedAdj + roofAdj + constructionAdj;
+      p = clamp(p, 1350, 1650); // brand band: ~$1,500/yr, never a bait-and-switch
+      return Math.round(p / 5) * 5; // tidy to $5
+    }
+    var premAnnual = recalcPremium();
+    var premMonthly = Math.round(premAnnual / 12);
+    var dataPoints = 140;
+
+    /* ---------------------------------------------------------------------
+       Confidence + decision — NOT constants. Confidence varies with how clean
+       the risk reads (roof age, construction, dwelling band); a genuinely
+       borderline risk is REFERRED to a human underwriter, which exercises the
+       'referred' enum and makes the calibration aside real rather than theater.
+       Per the product spec, ordinary demo applicants comfortably approve.
+       --------------------------------------------------------------------- */
+    function assessRisk() {
+      var score = 0.985;                                   // start from a clean baseline
+      if (roofAge > 25) score -= 0.18;                     // very old roof
+      else if (roofAge > 18) score -= 0.10;
+      else if (roofAge > 12) score -= 0.04;
+      if (yearBuilt < 1940) score -= 0.06;                 // very old build
+      if (squareFeet > 5000) score -= 0.05;                // large, harder to model
+      if (dwelling > 600000) score -= 0.05;                // top of the band
+      if (constructionType === "Masonry" || constructionType === "Brick") score += 0.015; // sturdier
+      var conf = clamp(score, 0.62, 0.985);
+      // A risk only refers when the model is genuinely unsure (low confidence).
+      var decision = conf < 0.78 ? "referred" : "approved";
+      return { confidence: Math.round(conf * 1000) / 1000, decision: decision };
+    }
+    var assessment = assessRisk();
+    var confidence = assessment.confidence;
+    var decisionOutcome = assessment.decision; // "approved" | "referred"
+
+    /* ROP tier label for the decision card */
+    var tierMap = {
+      bronze: { name: "Bronze", back: 7500 },
+      silver: { name: "Silver", back: 22500 },
+      gold:   { name: "Gold",   back: 45000 }
+    };
+    var tier = tierMap[ropTier] || tierMap.bronze;
+
+    /* ---------------------------------------------------------------------
+       Element refs
+       --------------------------------------------------------------------- */
+    var $ = function (id) { return document.getElementById(id); };
+    var orbit = $("uw-orbit");
+    var capTxt = $("uw-cap-txt");
+    var cap = $("uw-cap");
+    var p1 = $("uw-p1"), p2 = $("uw-p2");
+    var sourcesEl = $("uw-sources");
+    var reasonEl = $("uw-reason");
+    var pointsEl = $("uw-points"), elapsedEl = $("uw-elapsed");
+    var confValEl = $("uw-conf-val"), confFill = $("uw-conf-fill");
+    var decision = $("uw-decision"), runner = $("uw-runner");
+
+    var reduce = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+    /* ---------------------------------------------------------------------
+       Data sources (Phase 1) — each lights in sequence with a data readout
+       --------------------------------------------------------------------- */
+    var roofCondition = roofAge <= 10 ? "good" : roofAge <= 20 ? "fair" : "aging";
+    var SOURCES = [
+      { name: "Property records",        icon: "home",   read: yearBuilt + " · " + squareFeet.toLocaleString("en-US") + " sq ft", pts: 31 },
+      { name: "Geospatial / roof imagery", icon: "image", read: "Roof " + roofYear + " · " + roofCondition, pts: 24 },
+      { name: "Catastrophe model",       icon: "shield", read: "Wind/hail moderate",  pts: 22 },
+      { name: "Replacement cost",        icon: "dollar", read: fmt.currencyShort(dwelling) + " confirmed", pts: 18 },
+      { name: "Prior-claims history",    icon: "claim",  read: "No prior losses",     pts: 26 },
+      { name: "Insurance score",         icon: "check",  read: "Strong",              pts: 19 }
+    ];
+
+    sourcesEl.innerHTML = SOURCES.map(function (s, i) {
+      return '<div class="uw-source" id="src-' + i + '">' +
+        '<span class="s-ico">' + icon(s.icon) + '</span>' +
+        '<span class="s-name">' + s.name + '</span>' +
+        '<span class="s-state" id="src-state-' + i + '"><span class="s-spin"></span></span>' +
+        '<span class="s-check">' + icon("check") + '</span>' +
+      '</div>';
+    }).join("");
+
+    /* Build orbit nodes (6, one per source), positioned on a ring */
+    SOURCES.forEach(function (s, i) {
+      var node = document.createElement("span");
+      node.className = "node";
+      node.id = "node-" + i;
+      var angle = (i / SOURCES.length) * 360;
+      // Land each node ON a ring: outer ring r2 sits at radius 102, inner ring r3 at 64
+      // (orbit is 280px → 140px to its edge; ring insets are 38px and 76px).
+      var radius = i % 2 === 0 ? 102 : 64;
+      node.style.setProperty("--a", angle + "deg");
+      node.style.setProperty("--r", radius + "px");
+      orbit.appendChild(node);
+    });
+
+    /* ---------------------------------------------------------------------
+       Reasoning lines (Phase 2)
+       --------------------------------------------------------------------- */
+    var roofClause = roofAge <= 10
+      ? "within tolerance for the dwelling form"
+      : roofAge <= 20 ? "noted; priced into the windstorm deductible" : "older — a modest load applied";
+    var REASONS = [
+      { t: "Roof age <b>" + roofAge + " year" + (roofAge === 1 ? "" : "s") + "</b> — " + roofClause + "." },
+      { t: "<b>No prior losses</b> on record — clean history." },
+      { t: "Windstorm exposure <b>moderate</b> — priced into the 1% deductible." },
+      { t: "Replacement cost <b>" + fmt.currency0(dwelling) + "</b> confirmed against imagery." },
+      { t: "Construction <b>" + constructionType + "</b>, " + stories + " " + (stories === 1 ? "story" : "stories") + " — standard risk profile." },
+      { t: "Insurance score <b>strong</b> — no underwriting flags raised." }
+    ];
+
+    /* ---------------------------------------------------------------------
+       Live counters
+       --------------------------------------------------------------------- */
+    var t0 = performance.now();
+    var rafId = null;
+    var elapsedRunning = true;
+    function tickElapsed() {
+      if (!elapsedRunning) return;
+      var s = (performance.now() - t0) / 1000;
+      elapsedEl.textContent = s.toFixed(1) + "s";
+      rafId = requestAnimationFrame(tickElapsed);
+    }
+    tickElapsed();
+
+    var ptsShown = 0;
+    function bumpPoints(to, ms) {
+      var from = ptsShown, start = performance.now();
+      function step() {
+        var k = Math.min(1, (performance.now() - start) / ms);
+        ptsShown = Math.round(from + (to - from) * k);
+        pointsEl.textContent = ptsShown;
+        if (k < 1) requestAnimationFrame(step);
+      }
+      step();
+    }
+
+    /* ---------------------------------------------------------------------
+       Phase orchestration
+       --------------------------------------------------------------------- */
+    var timers = [];
+    function after(ms, fn) { var id = setTimeout(fn, ms); timers.push(id); return id; }
+    function clearTimers() { timers.forEach(clearTimeout); timers = []; }
+
+    function setPhase(n) {
+      ["ph-1", "ph-2", "ph-3"].forEach(function (id, i) {
+        var el = $(id);
+        el.classList.toggle("active", (i + 1) === n);
+        el.classList.toggle("done", (i + 1) < n);
+        if ((i + 1) < n) { el.querySelector(".pnum").innerHTML = icon("check"); }
+      });
+    }
+
+    var finished = false;
+
+    function runPhase1() {
+      setPhase(1);
+      orbit.classList.add("scanning");
+      capTxt.textContent = "Aggregating data sources";
+      var perStep = reduce ? 0 : 360;
+      var acc = 0;
+      SOURCES.forEach(function (s, i) {
+        after(reduce ? 0 : (i * perStep + 200), function () {
+          $("src-" + i).classList.add("lit");
+          var node = $("node-" + i); if (node) node.classList.add("lit");
+          $("src-state-" + i).innerHTML = s.read;
+          acc += s.pts;
+          bumpPoints(acc, reduce ? 0 : 320);
+        });
+      });
+      after(reduce ? 0 : (SOURCES.length * perStep + 500), function () {
+        bumpPoints(dataPoints, reduce ? 0 : 300);
+        runPhase2();
+      });
+    }
+
+    function runPhase2() {
+      setPhase(2);
+      orbit.classList.remove("scanning");
+      capTxt.textContent = "Underwriting with the Self-Insure model";
+      // core swaps to a "thinking" pulse
+      $("uw-core").style.animation = reduce ? "" : "pulse-op 1.2s var(--ease) infinite";
+      // swap panels
+      p1.classList.add("hidden");
+      p2.classList.remove("hidden");
+
+      var perLine = reduce ? 0 : 620;
+      reasonEl.innerHTML = REASONS.map(function (r, i) {
+        return '<div class="uw-rline" id="rl-' + i + '"><span class="r-ico">' + icon("check") + '</span><span class="r-txt">' + r.t + '</span></div>';
+      }).join("");
+
+      REASONS.forEach(function (r, i) {
+        after(reduce ? 0 : (i * perLine + 150), function () { $("rl-" + i).classList.add("in"); });
+      });
+
+      // confidence climbs toward target
+      var confStart = performance.now();
+      var confDur = reduce ? 0 : (REASONS.length * perLine);
+      function confStep() {
+        var k = reduce ? 1 : Math.min(1, (performance.now() - confStart) / confDur);
+        var eased = 1 - Math.pow(1 - k, 2);
+        var cur = eased * confidence;
+        confValEl.textContent = Math.round(cur * 100) + "%";
+        confFill.style.width = (cur * 100) + "%";
+        if (k < 1) requestAnimationFrame(confStep);
+      }
+      after(150, confStep);
+
+      after(reduce ? 0 : (REASONS.length * perLine + 700), function () { runPhase3(); });
+    }
+
+    function runPhase3() {
+      if (finished) return;
+      finished = true;
+      setPhase(3);
+      elapsedRunning = false;
+      if (rafId) cancelAnimationFrame(rafId);
+
+      // Freeze the elapsed counter at the REAL measured time so the copy and the
+      // live readout can never contradict each other. The settled value reads in
+      // whole seconds (e.g. "9s"); the trust line states the upper bound (<30s).
+      var elapsedSec = Math.max(1, Math.round((performance.now() - t0) / 1000));
+      elapsedEl.textContent = elapsedSec + "s";
+
+      // persist resolved numbers back to the draft
+      draft.quote.premiumAnnual = premAnnual;
+      draft.quote.premiumMonthly = premMonthly;
+      draft.quote.decision = decisionOutcome;
+      draft.quote.decisionConfidence = confidence;
+      draft.quote.dataPointsAggregated = dataPoints;
+      draft.quote.secondsToUnderwrite = elapsedSec;
+      try { sessionStorage.setItem("si-quote-draft", JSON.stringify(draft)); } catch (e) {}
+
+      // collapse the runner caption to a settled state
+      capTxt.textContent = "Decision reached";
+      cap.querySelector(".lv").style.display = "none";
+      confValEl.textContent = Math.round(confidence * 100) + "%";
+      confFill.style.width = (confidence * 100) + "%";
+      pointsEl.textContent = dataPoints;
+      $("uw-core").style.animation = "";
+      $("uw-core").innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>';
+      orbit.querySelectorAll(".node").forEach(function (n) { n.classList.add("lit"); });
+
+      // fill the decision card
+      fillDecision();
+      if (decisionOutcome === "referred") applyReferredState();
+      decision.classList.remove("hidden");
+      // force a reflow so the transition runs, then reveal (setTimeout is more
+      // reliable than nested rAF when the tab is busy/backgrounded)
+      void decision.offsetWidth;
+      after(reduce ? 0 : 30, function () { decision.classList.add("in"); });
+      // bring it into view
+      if (!reduce) after(140, function () { decision.scrollIntoView({ behavior: "smooth", block: "start" }); });
+    }
+
+    function fillDecision() {
+      $("uw-prem-yr").textContent = fmt.currency0(premAnnual);
+      $("uw-prem-mo").textContent = fmt.currency0(premMonthly);
+      $("uw-conf-pill").textContent = Math.round(confidence * 100) + "% confidence";
+      $("uw-rop-pill").textContent = tier.name + " ROP · " + fmt.currency0(tier.back) + " back";
+      $("uw-ded").textContent = fmt.currency0(deductible);
+      // windstorm deductible is 1% of the DRAFT's dwelling, not a fixed $4,200 (Eleanor's home)
+      $("uw-wh").textContent = "1% (" + fmt.currency0(Math.round(dwelling * 0.01)) + ")";
+
+      // coverage rows derived from the dwelling amount (standard HO-3 ratios)
+      var covs = [
+        { code: "A", name: "Dwelling",          amt: dwelling },
+        { code: "B", name: "Other structures",  amt: Math.round(dwelling * 0.10) },
+        { code: "C", name: "Personal property", amt: Math.round(dwelling * 0.50) },
+        { code: "D", name: "Loss of use",       amt: Math.round(dwelling * 0.20) },
+        { code: "E", name: "Liability",         amt: 300000 },
+        { code: "F", name: "Medical payments",  amt: 5000 }
+      ];
+      $("uw-cov").innerHTML = covs.map(function (c) {
+        return '<div class="cv"><span class="code-chip">' + c.code + '</span>' +
+          '<span class="cn">' + c.name + '</span>' +
+          '<span class="num">' + fmt.currencyShort(c.amt) + '</span></div>';
+      }).join("");
+
+      // review expander key-values
+      $("uw-review-kv").innerHTML =
+        kv("Applicant", (draft.applicant && (draft.applicant.firstName || draft.applicant.lastName)) ?
+            ((draft.applicant.firstName || "") + " " + (draft.applicant.lastName || "")).trim() : "New applicant") +
+        kv("Property", addrTxt) +
+        kv("Form", "HO-3 Homeowners (Special Form)") +
+        kv("Dwelling (Coverage A)", fmt.currency0(dwelling)) +
+        kv("All-perils deductible", fmt.currency0(deductible)) +
+        kv("Windstorm deductible", "1% of dwelling (" + fmt.currency0(Math.round(dwelling * 0.01)) + ")") +
+        kv("Return of Premium", tier.name + " — " + fmt.currency0(tier.back) + " back if claims-free") +
+        kv("Annual premium", fmt.currency0(premAnnual)) +
+        kv("Monthly premium", fmt.currency0(premMonthly)) +
+        kv("Model confidence", Math.round(confidence * 100) + "%") +
+        kv("Data points", dataPoints + " aggregated in <3s") +
+        kv("Decision", decisionOutcome === "referred"
+            ? "Referred to a human underwriter"
+            : "Approved · bound same day");
+    }
+    function kv(k, v) { return "<dt>" + k + "</dt><dd>" + v + "</dd>"; }
+
+    /* ---------------------------------------------------------------------
+       Referred branch — rare, but real. When the model is genuinely unsure it
+       hands the file to a human underwriter rather than auto-binding. We reshape
+       the decision card honestly: no instant bind, a callback CTA instead.
+       --------------------------------------------------------------------- */
+    function applyReferredState() {
+      // headline + hero glyph
+      $("uw-approved").textContent = "Referred for review.";
+      $("uw-approved-sub").textContent =
+        "Your home is insurable — a couple of factors put it just outside instant approval, so a licensed underwriter is taking a look. Most referrals clear within a business day.";
+      var hero = $("uw-bigcheck");
+      hero.style.background = "var(--info-tint)";
+      hero.style.color = "var(--info)";
+      hero.style.animation = "uw-pop .55s var(--ease) both"; // drop the celebratory halo
+      hero.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16h.01"/></svg>';
+
+      // the calibration aside now describes THIS file
+      $("uw-aside-txt").innerHTML =
+        "<b>Most applicants are approved instantly.</b> Yours landed in the small share we route to a human underwriter — that calibration is how the model stays honest. <b>Your quote below is held</b>; we'll confirm it as soon as the review clears.";
+
+      // swap the bind CTA's LABEL to a callback (the bind handler is gated off
+      // for referred, above; this click handler owns the referred behavior).
+      var bindBtn = $("uw-bind-btn");
+      bindBtn.innerHTML = icon("phone") + " Request a callback";
+      bindBtn.addEventListener("click", function () {
+        if (bindBtn.disabled) return;
+        bindBtn.disabled = true;
+        bindBtn.innerHTML = icon("check") + " Callback requested";
+        SI.ui.toast("A licensed underwriter will call you today to finish your application.", "info", { title: "Callback requested" });
+      });
+    }
+
+    /* ---------------------------------------------------------------------
+       Skip → jump straight to phase 3
+       --------------------------------------------------------------------- */
+    function skipToDecision() {
+      clearTimers();
+      // light everything for a coherent end-state
+      SOURCES.forEach(function (s, i) {
+        $("src-" + i).classList.add("lit");
+        $("src-state-" + i).innerHTML = s.read;
+        var n = $("node-" + i); if (n) n.classList.add("lit");
+      });
+      pointsEl.textContent = dataPoints;
+      p1.classList.add("hidden"); p2.classList.remove("hidden");
+      reasonEl.innerHTML = REASONS.map(function (r) {
+        return '<div class="uw-rline in"><span class="r-ico">' + icon("check") + '</span><span class="r-txt">' + r.t + '</span></div>';
+      }).join("");
+      runPhase3();
+    }
+    $("uw-skip").addEventListener("click", skipToDecision);
+
+    /* ---------------------------------------------------------------------
+       Bind flow. In the referred branch this same button becomes a callback
+       request (see applyReferredState), so the bind path is gated on outcome.
+       --------------------------------------------------------------------- */
+    $("uw-bind-btn").addEventListener("click", function () {
+      if (decisionOutcome === "referred") return; // referred → callback, handled separately
+      var bind = $("uw-bind");
+      // overlay sits on the runner card; scroll it into view so the bind reads
+      runner.scrollIntoView({ behavior: reduce ? "auto" : "smooth", block: "center" });
+      bind.classList.add("show");
+      after(reduce ? 0 : 1500, function () {
+        bind.classList.add("done");
+        $("uw-bind-ring").innerHTML = icon("check");
+        $("uw-bind-title").textContent = "Policy bound · active today";
+        $("uw-bind-sub").textContent = "Welcome to Self-Insure. Taking you to your dashboard…";
+        try {
+          sessionStorage.setItem("si-just-bound", "1");
+          localStorage.setItem("si-authed", "1");
+        } catch (e) {}
+        SI.ui.toast("Policy bound — you're covered as of today.", "ai", { title: "Approved & active" });
+        after(reduce ? 200 : 1300, function () { SI.ui.route("dashboard.html"); });
+      });
+    });
+
+    /* Review coverage expander */
+    var reviewOpen = false;
+    $("uw-review-btn").addEventListener("click", function () {
+      reviewOpen = !reviewOpen;
+      $("uw-review").classList.toggle("open", reviewOpen);
+      this.textContent = reviewOpen ? "Hide coverage" : "Review coverage";
+      if (reviewOpen && !reduce) after(60, function () { $("uw-review").scrollIntoView({ behavior: "smooth", block: "nearest" }); });
+    });
+
+    /* ---------------------------------------------------------------------
+       Go. Respect reduced-motion (jump straight to the result with a fade).
+       --------------------------------------------------------------------- */
+    if (reduce) {
+      skipToDecision();
+    } else {
+      after(350, runPhase1);
+    }
+  });
+  </script>
+</body>
+</html>
