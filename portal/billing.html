@@ -1,0 +1,646 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Billing &amp; payments · Self-Insure</title>
+  <meta name="description" content="Self-Insure billing — balance, autopay, payment method, history, and your Return-of-Premium ledger." />
+  <!-- theme before paint, no flash -->
+  <script src="theme.js"></script>
+  <link rel="stylesheet" href="styles.css" />
+
+  <!-- screen-scoped tweaks only; everything else reuses the shared kit -->
+  <style>
+    /* pay-ahead success animation (scoped to this screen + its pay sheet) */
+    .pay-success { text-align: center; padding: 12px 8px 4px; }
+    .pay-check {
+      width: 66px; height: 66px; border-radius: 50%; margin: 0 auto 16px;
+      display: grid; place-items: center;
+      background: var(--ai); color: var(--ai-ink);
+      animation: pay-pop .42s var(--ease) both;
+    }
+    .pay-check svg { width: 34px; height: 34px; }
+    .pay-check svg path {
+      stroke-dasharray: 30; stroke-dashoffset: 30;
+      animation: pay-draw .5s var(--ease) .16s forwards;
+    }
+    @keyframes pay-pop {
+      0% { transform: scale(.4); opacity: 0; }
+      60% { transform: scale(1.08); }
+      100% { transform: scale(1); opacity: 1; }
+    }
+    @keyframes pay-draw { to { stroke-dashoffset: 0; } }
+    .pay-success-amt { font-family: var(--font-display); font-size: 38px; font-weight: 500; color: var(--ai); letter-spacing: -.015em; line-height: 1; }
+
+    /* the ROP mini-ledger bar */
+    .ledger-bar { height: 12px; border-radius: 999px; background: var(--surface-2); border: 1px solid var(--border); overflow: hidden; position: relative; }
+    .ledger-bar .seg { height: 100%; background: var(--ai); width: 0; transition: width .9s var(--ease); }
+
+    /* method row card */
+    .method-row { display: flex; align-items: center; gap: 13px; padding: 13px 15px; border: 1px solid var(--border); border-radius: var(--r-card); background: var(--surface-2); }
+    .method-brand { width: 42px; height: 28px; border-radius: 6px; background: var(--brand); color: var(--brand-ink); display: grid; place-items: center; font-weight: 700; font-size: 11px; letter-spacing: .03em; flex: 0 0 42px; }
+
+    /* warning state when autopay is off */
+    .autopay-warn { display: none; }
+    .billing[data-autopay="off"] .autopay-warn { display: flex; }
+    .billing[data-autopay="off"] #autopay-line { display: none; }
+
+    /* stat card actions sit at the bottom */
+    .stat-card { display: flex; flex-direction: column; }
+    .stat-card .sc-action { margin-top: auto; padding-top: 16px; }
+
+    .receipt-line { display: flex; justify-content: space-between; padding: 9px 0; border-bottom: 1px solid var(--border-2); font-size: 13px; }
+    .receipt-line:last-child { border-bottom: 0; }
+    .receipt-line .rl-k { color: var(--text-2); }
+    .receipt-line .rl-v { color: var(--text); font-weight: 500; }
+  </style>
+  <link rel="icon" type="image/svg+xml" href="favicon.svg">
+</head>
+<body>
+  <!-- app.js wraps [data-content] in the persistent shell (sidebar + topbar + FAB) -->
+  <div data-content>
+    <div class="billing" id="billing-root" data-autopay="on">
+
+      <!-- Header -->
+      <div class="section" style="margin-bottom:20px;">
+        <h2 class="display" style="font-size:28px;">Billing &amp; payments</h2>
+        <p class="muted" style="margin-top:4px;">
+          Policy <strong style="color:var(--text);">SI-OH-204871</strong> · HO-3 Homeowners ·
+          <span class="pill pill-ai"><span class="dot"></span>Up to date</span>
+        </p>
+      </div>
+
+      <!-- Top summary row: three stat cards -->
+      <div class="grid grid-12 section">
+        <div class="card card-hover col-4 stat-card">
+          <div class="card-head"><div class="card-title">Current balance</div></div>
+          <div class="stat">
+            <div class="stat-value ai" id="bal-amt">$0</div>
+            <div class="stat-sub" id="bal-status">Up to date · nothing due</div>
+          </div>
+          <div class="sc-action">
+            <span class="pill pill-ai"><span class="dot"></span>No payment needed</span>
+          </div>
+        </div>
+
+        <div class="card card-hover col-4 stat-card">
+          <div class="card-head"><div class="card-title">Next payment</div></div>
+          <div class="stat">
+            <div class="stat-value" id="next-amt">$125</div>
+            <div class="stat-sub">on <span id="next-date">Jul 1</span> · <span id="next-method">Visa •4242</span></div>
+          </div>
+          <div class="sc-action" style="display:flex;gap:8px;flex-wrap:wrap;">
+            <button class="btn btn-primary btn-sm" id="pay-now-btn">Pay $125 now</button>
+            <a class="btn btn-ghost btn-sm" href="#autopay" id="manage-autopay-link">Manage autopay</a>
+          </div>
+        </div>
+
+        <div class="card card-hover col-4 stat-card">
+          <div class="card-head"><div class="card-title">Paid to date</div></div>
+          <div class="stat">
+            <div class="stat-value" id="paid-amt">$9,000</div>
+            <div class="stat-sub">since 2020 · 6 years of cover</div>
+          </div>
+          <div class="sc-action">
+            <a class="card-link" href="#rop-ledger">See what's coming back
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg></a>
+          </div>
+        </div>
+      </div>
+
+      <!-- AI insight + ROP ledger row -->
+      <div class="grid grid-12 section">
+        <!-- AI insight -->
+        <div class="card card-ai-tint col-7" style="display:flex;align-items:flex-start;gap:14px;">
+          <span class="r-ico" style="width:40px;height:40px;flex:0 0 40px;border-radius:11px;background:var(--ai);color:var(--ai-ink);display:grid;place-items:center;">
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l1.6 4.6L18 9l-4.4 1.4L12 15l-1.6-4.6L6 9l4.4-1.4z"/><path d="M19 14l.8 2.2L22 17l-2.2.8L19 20l-.8-2.2L16 17l2.2-.8z"/></svg>
+          </span>
+          <div style="flex:1;min-width:0;">
+            <div class="eyebrow" style="color:var(--ai);margin-bottom:5px;">Self-Insure AI · billing insight</div>
+            <div style="font-size:14.5px;line-height:1.5;color:var(--text);">
+              You're on track, Eleanor. Staying claims-free keeps your
+              <strong style="color:var(--ai);">$7,500</strong> Return-of-Premium on schedule for year 10.
+              Your autopay covers everything automatically — there's nothing you need to do.
+            </div>
+            <div class="chip-row" style="margin-top:12px;">
+              <button class="chip chip-ai" data-ask="How much do I get back and when?">When do I get my money back?</button>
+              <button class="chip chip-ai" data-ask="Ask about a charge on my account">Ask about a charge</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- ROP ledger cross-link -->
+        <div class="card card-hover col-5" id="rop-ledger">
+          <div class="card-head">
+            <div class="card-title"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 9-9"/><path d="M3 4v5h5"/></svg>Return-of-Premium ledger</div>
+            <a class="card-link" href="policy.html#rop">See ROP details
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg></a>
+          </div>
+          <p class="muted" style="font-size:13.5px;line-height:1.5;margin-bottom:14px;">
+            You've paid <strong class="num" style="font-size:15px;color:var(--text);" id="led-paid">$9,000</strong> and stayed claims-free —
+            you're on track to get <strong class="num ai" style="font-size:15px;" id="led-return">$7,500</strong> back at year 10 of your Bronze track.
+          </p>
+          <div class="ledger-bar" aria-label="Return-of-Premium track progress"><div class="seg" id="led-seg"></div></div>
+          <div class="progress-labels"><span>Year 1</span><span id="led-end">Year 6 of 10 · $7,500 returns at year 10</span></div>
+        </div>
+      </div>
+
+      <!-- Autopay & method -->
+      <div class="card section" id="autopay">
+        <div class="card-head">
+          <div class="card-title">Autopay &amp; payment method</div>
+        </div>
+
+        <div class="grid grid-2" style="gap:24px;">
+          <!-- Autopay -->
+          <div>
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px;">
+              <div>
+                <div style="font-weight:600;font-size:14px;">Autopay</div>
+                <div class="tiny muted" id="autopay-status-label">On · charges automatically</div>
+              </div>
+              <label class="switch" aria-label="Toggle autopay">
+                <input type="checkbox" id="autopay-toggle" checked />
+                <span class="track"></span>
+              </label>
+            </div>
+            <p class="muted tiny" id="autopay-line" style="line-height:1.5;">
+              We charge <strong style="color:var(--text);">$125</strong> to <strong style="color:var(--text);" id="ap-method">Visa •4242</strong> on the
+              <strong style="color:var(--text);">1st</strong> of each month. You don't need to do a thing.
+            </p>
+            <div class="autopay-warn" style="gap:9px;align-items:flex-start;padding:11px 13px;border-radius:10px;background:var(--warning-tint);border:1px solid transparent;">
+              <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="var(--warning)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex:0 0 17px;margin-top:1px;"><path d="M10.3 3.9L1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/><path d="M12 9v4M12 17h.01"/></svg>
+              <span class="tiny" style="color:var(--text);line-height:1.5;">Autopay is <strong>off</strong> — you'll need to pay your <strong>$125</strong> premium manually each month by the 1st.</span>
+            </div>
+          </div>
+
+          <!-- Payment method -->
+          <div>
+            <div style="font-weight:600;font-size:14px;margin-bottom:12px;">Payment method</div>
+            <div class="method-row" style="margin-bottom:12px;">
+              <span class="method-brand">VISA</span>
+              <div style="flex:1;min-width:0;">
+                <div style="font-weight:600;font-size:13.5px;">Visa ending <span id="method-last4">4242</span></div>
+                <div class="tiny muted">Expires <span id="method-exp">08/28</span></div>
+              </div>
+              <span class="pill pill-ai" style="height:24px;"><span class="dot"></span>Default</span>
+            </div>
+            <button class="btn btn-ghost btn-sm" id="update-method-btn">Update payment method</button>
+          </div>
+        </div>
+
+        <hr style="border:0;border-top:1px solid var(--border);margin:22px 0;" />
+
+        <!-- Billing cadence -->
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;">
+          <div>
+            <div style="font-weight:600;font-size:14px;">Billing cadence</div>
+            <div class="tiny muted" id="cadence-note">Monthly · $125 charged on the 1st</div>
+          </div>
+          <div class="segmented" role="tablist" aria-label="Billing cadence">
+            <button id="cad-monthly" class="active" aria-pressed="true">Monthly · $125</button>
+            <button id="cad-annual" aria-pressed="false">Annual · $1,500</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Make a payment + Payment history -->
+      <div class="card section flush">
+        <div class="card-head" style="padding:20px 22px 0;">
+          <div class="card-title">Payment history</div>
+          <button class="btn btn-primary btn-sm" id="pay-ahead-btn" style="margin-bottom:2px;">Pay $125 ahead</button>
+        </div>
+        <p class="muted tiny" style="padding:6px 22px 14px;">Every payment is receipted. Pay-ahead amounts are applied to your next premium.</p>
+        <div class="table-wrap" style="border-radius:0;border-left:0;border-right:0;border-bottom:0;">
+          <table class="data" id="pay-table">
+            <thead>
+              <tr>
+                <th>Date</th>
+                <th>Description</th>
+                <th>Method</th>
+                <th class="td-num">Amount</th>
+                <th>Status</th>
+                <th class="td-action">Receipt</th>
+              </tr>
+            </thead>
+            <tbody id="pay-rows"></tbody>
+          </table>
+        </div>
+        <div style="padding:14px 22px;border-top:1px solid var(--border);">
+          <button class="btn btn-ghost btn-sm" id="annual-stmt-btn">
+            <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
+            Download annual statement (PDF)
+          </button>
+        </div>
+      </div>
+
+      <!-- Paperless & statements -->
+      <div class="card section">
+        <div class="card-head"><div class="card-title">Paperless &amp; statements</div></div>
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;">
+          <div>
+            <div style="font-weight:600;font-size:14px;">Paperless billing</div>
+            <div class="tiny muted">Statements and receipts go to <span id="paperless-email"></span> — no paper mail.</div>
+          </div>
+          <label class="switch" aria-label="Toggle paperless billing">
+            <input type="checkbox" id="paperless-toggle" checked />
+            <span class="track"></span>
+          </label>
+        </div>
+        <p class="tiny muted-3" style="margin-top:14px;line-height:1.5;">
+          Your annual premium summary is available each January for tax and records. Home insurance premiums on a primary residence generally aren't tax-deductible — keep your statement for your files.
+        </p>
+      </div>
+
+    </div>
+  </div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+  <script src="account.js"></script>
+  <script src="intents.js"></script>
+  <script src="app.js"></script>
+  <script>
+    document.addEventListener("selfinsure:ready", function () {
+      var A = SI.account, fmt = SI.fmt, B = A.billing;
+      var root = document.getElementById("billing-root");
+
+      /* ---- helpers ---- */
+      function st() { return SI.state.get(); }
+      function methodLabel() { return "Visa •" + st().last4; }
+
+      /* ============================================================
+         TOP SUMMARY + AI INSIGHT + LEDGER (all from account data)
+         ============================================================ */
+      document.getElementById("bal-amt").textContent = fmt.currency0(B.balance);
+      document.getElementById("paid-amt").textContent = fmt.currency0(B.paidToDate);
+      document.getElementById("next-amt").textContent = fmt.currency0(B.nextPaymentAmount);
+      document.getElementById("next-date").textContent = fmt.dateShort(B.nextPaymentDate);
+
+      document.getElementById("led-paid").textContent = fmt.currency0(A.rop.paidIntoTrack);
+      document.getElementById("led-return").textContent = fmt.currency0(A.rop.bronzeReturnAmount);
+      // Honest bar: years-elapsed progress toward the 10-year payout (year 6 of 10 = 60%),
+      // matching policy.html. Never derive the fill from return/paid (a meaningless ratio).
+      var ledPct = A.rop.progressPct; // 60
+      document.getElementById("led-end").textContent =
+        "Year " + A.rop.policyYear + " of " + A.rop.enrolledTermYears +
+        " · " + fmt.currency0(A.rop.bronzeReturnAmount) + " returns at year " + A.rop.bronzeReturnAtYear;
+      setTimeout(function () { document.getElementById("led-seg").style.width = ledPct + "%"; }, 200);
+
+      /* Two DISTINCT CTAs so they don't read as filler duplicates:
+         - top card: pays exactly the next monthly charge early (balance is $0, so
+           "Pay next month early" is honest — nothing is overdue);
+         - history card: opens the pay-ahead sheet with a 1/3/6-month chooser. */
+      document.getElementById("pay-now-btn").textContent =
+        "Pay " + fmt.currency0(B.nextPaymentAmount) + " for " + fmt.dateShort(B.nextPaymentDate);
+      document.getElementById("pay-ahead-btn").textContent = "Pay ahead";
+
+      /* ============================================================
+         AUTOPAY + METHOD + CADENCE — reflect persisted overrides
+         ============================================================ */
+      var apToggle = document.getElementById("autopay-toggle");
+      var apStatusLabel = document.getElementById("autopay-status-label");
+      var nextMethodEl = document.getElementById("next-method");
+
+      function paintMethod() {
+        var lbl = methodLabel();
+        document.getElementById("method-last4").textContent = st().last4;
+        document.getElementById("ap-method").textContent = lbl;
+        nextMethodEl.textContent = lbl;
+      }
+      function paintAutopay() {
+        var on = st().autopay;
+        apToggle.checked = on;
+        root.setAttribute("data-autopay", on ? "on" : "off");
+        apStatusLabel.textContent = on ? "On · charges automatically" : "Off · pay manually each month";
+        // emphasise Pay-now when off
+        var payNow = document.getElementById("pay-now-btn");
+        payNow.classList.toggle("btn-primary", true);
+      }
+
+      paintMethod();
+      paintAutopay();
+
+      /* autopay toggle with confirm on turning OFF */
+      apToggle.addEventListener("change", function () {
+        if (!apToggle.checked) {
+          // user is turning it off -> confirm
+          apToggle.checked = true; // revert until confirmed
+          SI.ui.confirm(
+            "You'll need to pay your $125 premium manually each month by the 1st. We'll send a reminder, but a missed payment can affect your coverage and your Return-of-Premium track.",
+            { title: "Turn off autopay?", confirm: "Turn off autopay", cancel: "Keep autopay on", danger: true }
+          ).then(function (ok) {
+            if (ok) {
+              SI.state.patch("autopay", false);
+              paintAutopay();
+              SI.ui.toast("Autopay turned off. Remember to pay by the 1st each month.", "warning", { title: "Autopay off" });
+            }
+          });
+        } else {
+          SI.state.patch("autopay", true);
+          paintAutopay();
+          SI.ui.toast("Autopay is back on — $125 will run on the 1st.", "ai", { title: "Autopay on" });
+        }
+      });
+
+      /* update payment method modal */
+      document.getElementById("update-method-btn").addEventListener("click", function () {
+        var node = document.createElement("div");
+        node.innerHTML =
+          '<div class="modal-head"><div class="modal-title">Update payment method</div>' +
+          '<button class="modal-close" data-close aria-label="Close">' + SI.icon("x") + '</button></div>' +
+          '<div class="modal-body">' +
+            '<div class="field" style="margin-bottom:14px;"><label for="cc-num">Card number</label>' +
+            '<input class="input" id="cc-num" inputmode="numeric" autocomplete="cc-number" placeholder="4242 4242 4242 4242" value="4242 4242 4242 4242" /></div>' +
+            '<div style="display:flex;gap:12px;">' +
+              '<div class="field" style="flex:1;"><label for="cc-exp">Expiry</label>' +
+              '<input class="input" id="cc-exp" autocomplete="cc-exp" placeholder="MM/YY" value="08/28" /></div>' +
+              '<div class="field" style="flex:1;"><label for="cc-cvc">CVC</label>' +
+              '<input class="input" id="cc-cvc" inputmode="numeric" autocomplete="cc-csc" placeholder="123" value="" /></div>' +
+            '</div>' +
+            '<p class="tiny muted-3" style="margin-top:6px;">Demo only — no real card is stored or charged.</p>' +
+            '<div class="err-msg" id="cc-err" style="display:none;color:var(--danger);font-size:12px;margin-top:8px;"></div>' +
+          '</div>' +
+          '<div class="modal-foot"><button class="btn btn-ghost" data-close>Cancel</button>' +
+          '<button class="btn btn-primary" data-save>Save card</button></div>';
+        var m = SI.ui.openModal(node);
+        m.querySelector("[data-save]").addEventListener("click", function (e) {
+          var num = m.querySelector("#cc-num").value.replace(/[^0-9]/g, "");
+          var err = m.querySelector("#cc-err");
+          if (num.length < 15) { err.textContent = "Enter a valid card number (try 4242 4242 4242 4242)."; err.style.display = "block"; return; }
+          var last4 = num.slice(-4);
+          var btn = e.currentTarget; btn.innerHTML = '<span class="spinner"></span>Saving…'; btn.disabled = true;
+          setTimeout(function () {
+            SI.state.patch("last4", last4);
+            paintMethod();
+            SI.ui.closeModal();
+            SI.ui.toast("Payment method updated to Visa •" + last4 + ".", "ai", { title: "Card updated" });
+          }, 900);
+        });
+      });
+
+      /* billing cadence segmented control */
+      var cadMonthly = document.getElementById("cad-monthly");
+      var cadAnnual = document.getElementById("cad-annual");
+      var cadenceNote = document.getElementById("cadence-note");
+      var renewalYear = SI.fmt.date(A.policy.termEnd).split(", ")[1]; // "2027"
+      function paintCadence() {
+        var annual = st().cadence === "annual";
+        cadMonthly.classList.toggle("active", !annual);
+        cadAnnual.classList.toggle("active", annual);
+        cadMonthly.setAttribute("aria-pressed", String(!annual));
+        cadAnnual.setAttribute("aria-pressed", String(annual));
+        // The NEXT actual charge never changes mid-term: $125 on Jul 1. Annual only
+        // takes effect at renewal, so we keep the real next charge on the summary card
+        // and explain the switch in the cadence note rather than faking a $1,500 charge.
+        document.getElementById("next-amt").textContent = fmt.currency0(B.nextPaymentAmount);
+        document.getElementById("next-date").textContent = fmt.dateShort(B.nextPaymentDate);
+        if (annual) {
+          cadenceNote.textContent = "Switches at renewal · " + fmt.currency0(B.premiumAnnual) +
+            " on " + fmt.dateShort(A.policy.termEnd) + ", " + renewalYear + " (your $125/mo continues until then)";
+        } else {
+          cadenceNote.textContent = "Monthly · " + fmt.currency0(B.premiumMonthly) + " charged on the 1st";
+        }
+      }
+      cadMonthly.addEventListener("click", function () { SI.state.patch("cadence", "monthly"); paintCadence(); });
+      cadAnnual.addEventListener("click", function () {
+        SI.state.patch("cadence", "annual"); paintCadence();
+        SI.ui.toast("You'll switch to annual billing at your " + fmt.dateShort(A.policy.termEnd) + ", " + renewalYear + " renewal — same total, one charge a year.", "info", { title: "Annual billing at renewal" });
+      });
+      paintCadence();
+
+      /* ============================================================
+         MAKE A PAYMENT — amount -> method -> confirm -> success
+         ============================================================ */
+      /* openPaySheet(opts):
+           opts.mode "single" → pay exactly the next monthly charge (top-card CTA).
+           opts.mode "ahead"  → pay 1 / 3 / 6 months ahead via a chooser (history CTA).
+         Balance is $0, so both pay ahead; "ahead" just lets you batch months. */
+      function openPaySheet(opts) {
+        opts = opts || {};
+        var mode = opts.mode === "ahead" ? "ahead" : "single";
+        var monthly = B.premiumMonthly;
+        // Single mode pays the real next charge ($125 on Jul 1) — annual only changes
+        // billing at renewal, so it never inflates the next actual charge mid-term.
+        var baseAmt = B.nextPaymentAmount;
+        var months = 1; // selected months in "ahead" mode
+        var amt = mode === "ahead" ? monthly * months : baseAmt;
+
+        var monthChooser = mode === "ahead"
+          ? '<div class="field"><div class="label" style="font-size:12px;color:var(--text-2);font-weight:500;margin-bottom:6px;">Pay ahead</div>' +
+              '<div class="segmented seg-full" id="ahead-seg" role="group" aria-label="Months to pay ahead">' +
+                '<button type="button" class="active" data-months="1">1 month</button>' +
+                '<button type="button" data-months="3">3 months</button>' +
+                '<button type="button" data-months="6">6 months</button>' +
+              '</div></div>'
+          : '';
+
+        var node = document.createElement("div");
+        node.innerHTML =
+          '<div class="modal-head"><div class="modal-title">' + (mode === "ahead" ? "Pay ahead" : "Make a payment") + '</div>' +
+          '<button class="modal-close" data-close aria-label="Close">' + SI.icon("x") + '</button></div>' +
+          '<div class="modal-body" id="pay-body">' +
+            monthChooser +
+            '<div class="field"><label for="pay-amt">Amount</label>' +
+            '<input class="input" id="pay-amt" type="text" value="' + fmt.currency0(amt) + '" inputmode="decimal"' + (mode === "ahead" ? ' readonly' : '') + ' /></div>' +
+            '<div class="field" style="margin-bottom:4px;"><div class="label" style="font-size:12px;color:var(--text-2);font-weight:500;margin-bottom:6px;">Payment method</div>' +
+              '<div class="method-row" style="background:var(--surface-2);">' +
+                '<span class="method-brand">VISA</span>' +
+                '<div style="flex:1;"><div style="font-weight:600;font-size:13.5px;">Visa ending ' + st().last4 + '</div>' +
+                '<div class="tiny muted">Default card · expires ' + B.paymentMethod.exp + '</div></div>' +
+              '</div>' +
+            '</div>' +
+            '<p class="tiny muted-3" id="pay-note" style="margin-top:10px;">' +
+              (mode === "ahead"
+                ? 'Your balance is $0. This pays <strong>' + months + ' month' + (months === 1 ? '' : 's') + '</strong> ahead and is credited to upcoming premiums.'
+                : 'Pays your ' + fmt.dateShort(B.nextPaymentDate) + ' premium early — your balance is $0, so this is credited to your next charge.') +
+            '</p>' +
+          '</div>' +
+          '<div class="modal-foot" id="pay-foot"><button class="btn btn-ghost" data-close>Cancel</button>' +
+          '<button class="btn btn-primary" data-confirm>Confirm payment</button></div>';
+        var m = SI.ui.openModal(node);
+
+        // wire the months chooser (ahead mode only)
+        if (mode === "ahead") {
+          var segBtns = m.querySelectorAll("#ahead-seg button");
+          segBtns.forEach(function (sb) {
+            sb.addEventListener("click", function () {
+              months = parseInt(sb.getAttribute("data-months"), 10) || 1;
+              amt = monthly * months;
+              segBtns.forEach(function (b) { b.classList.toggle("active", b === sb); b.setAttribute("aria-pressed", String(b === sb)); });
+              m.querySelector("#pay-amt").value = fmt.currency0(amt);
+              m.querySelector("#pay-note").innerHTML =
+                'Your balance is $0. This pays <strong>' + months + ' month' + (months === 1 ? '' : 's') + '</strong> ahead and is credited to upcoming premiums.';
+            });
+          });
+        }
+
+        m.querySelector("[data-confirm]").addEventListener("click", function (e) {
+          var raw = m.querySelector("#pay-amt").value.replace(/[^0-9.]/g, "");
+          var paid = Math.round(parseFloat(raw) || amt);
+          if (!paid || paid < 1) { return; }
+          var btn = e.currentTarget;
+          btn.innerHTML = '<span class="spinner"></span>Processing…'; btn.disabled = true;
+          m.querySelector("[data-close]").disabled = true;
+          setTimeout(function () {
+            // record it (session) so it shows up everywhere — single id source, tagged by kind
+            var id = SI.state.nextPaymentId();
+            SI.state.addPayment({ id: id, date: "2026-06-24", amount: paid, method: methodLabel(), status: "Paid", kind: "payahead" });
+            SI.state.addActivity({ id: "ACT-" + Date.now(), icon: "card", tone: "neutral", date: "2026-06-24", time: nowTime(), title: "Payment received", body: fmt.currency0(paid) + " paid via " + methodLabel() + ". Thank you.", link: "billing.html", unread: true });
+
+            // success animation inside the modal
+            m.querySelector("#pay-body").innerHTML =
+              '<div class="pay-success">' +
+                '<div class="pay-check"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg></div>' +
+                '<div class="pay-success-amt">' + fmt.currency0(paid) + '</div>' +
+                '<div class="muted" style="margin-top:8px;">Payment confirmed · ' + methodLabel() + '</div>' +
+                '<div class="tiny muted-3" style="margin-top:6px;">Receipt ' + id + ' · credited to your upcoming premiums.</div>' +
+              '</div>';
+            m.querySelector("#pay-foot").innerHTML =
+              '<button class="btn btn-ghost" data-receipt="' + id + '">View receipt</button>' +
+              '<button class="btn btn-primary" data-close>Done</button>';
+            m.querySelector("[data-receipt]").addEventListener("click", function () { SI.ui.closeModal(); var row = SI.allPayments()[0]; openReceipt(row); });
+
+            renderHistory();
+            window.dispatchEvent(new CustomEvent("selfinsure:payment", { detail: { amount: paid } }));
+          }, 1100);
+        });
+      }
+      document.getElementById("pay-now-btn").addEventListener("click", function () { openPaySheet({ mode: "single" }); });
+      document.getElementById("pay-ahead-btn").addEventListener("click", function () { openPaySheet({ mode: "ahead" }); });
+
+      function nowTime() {
+        var d = new Date(), h = d.getHours(), mm = ("0" + d.getMinutes()).slice(-2);
+        var ap = h >= 12 ? "PM" : "AM"; h = h % 12 || 12; return h + ":" + mm + " " + ap;
+      }
+
+      /* ============================================================
+         PAYMENT HISTORY TABLE (canonical + session pay-aheads)
+         ============================================================ */
+      var rowsEl = document.getElementById("pay-rows");
+      function renderHistory() {
+        var all = SI.allPayments();
+        rowsEl.innerHTML = all.map(function (p) {
+          // Description keys off the row's own kind, never its array position.
+          var desc = p.kind === "payahead" ? "Pay-ahead credit" : "Monthly premium";
+          return '<tr>' +
+            '<td style="white-space:nowrap;">' + fmt.date(p.date) + '</td>' +
+            '<td>' + desc + '</td>' +
+            '<td>' + p.method + '</td>' +
+            '<td class="td-num"><span class="num" style="font-size:13px;">' + fmt.currency0(p.amount) + '</span></td>' +
+            '<td><span class="pill pill-ai" style="height:23px;"><span class="dot"></span>' + p.status + '</span></td>' +
+            '<td class="td-action"><button class="btn btn-ghost btn-sm" data-receipt="' + p.id + '" aria-label="Receipt for ' + p.id + '" style="padding:0 9px;height:30px;">' +
+              '<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg></button></td>' +
+          '</tr>';
+        }).join("");
+        rowsEl.querySelectorAll("[data-receipt]").forEach(function (btn) {
+          btn.addEventListener("click", function () {
+            var id = btn.getAttribute("data-receipt");
+            var row = SI.allPayments().filter(function (p) { return p.id === id; })[0];
+            if (row) openReceipt(row);
+          });
+        });
+      }
+      renderHistory();
+      window.addEventListener("selfinsure:payment", renderHistory);
+
+      /* receipt modal */
+      function openReceipt(p) {
+        var node = document.createElement("div");
+        node.innerHTML =
+          '<div class="modal-head"><div class="modal-title">Receipt · ' + p.id + '</div>' +
+          '<button class="modal-close" data-close aria-label="Close">' + SI.icon("x") + '</button></div>' +
+          '<div class="modal-body">' +
+            '<div style="display:flex;align-items:center;gap:10px;margin-bottom:16px;">' +
+              '<span class="brand-monogram" style="width:34px;height:34px;font-size:13px;">SI</span>' +
+              '<div><div style="font-family:var(--font-display);font-size:17px;font-weight:600;">Self-Insure</div>' +
+              '<div class="tiny muted">the insurance that gives it back</div></div>' +
+            '</div>' +
+            '<div class="receipt-line"><span class="rl-k">Receipt no.</span><span class="rl-v">' + p.id + '</span></div>' +
+            '<div class="receipt-line"><span class="rl-k">Date</span><span class="rl-v">' + fmt.date(p.date) + '</span></div>' +
+            '<div class="receipt-line"><span class="rl-k">Policy</span><span class="rl-v">' + A.policy.number + '</span></div>' +
+            '<div class="receipt-line"><span class="rl-k">Description</span><span class="rl-v">Homeowners premium</span></div>' +
+            '<div class="receipt-line"><span class="rl-k">Method</span><span class="rl-v">' + p.method + '</span></div>' +
+            '<div class="receipt-line"><span class="rl-k">Status</span><span class="rl-v" style="color:var(--ai);">' + p.status + '</span></div>' +
+            '<div class="receipt-line" style="margin-top:6px;border-top:1px solid var(--border);padding-top:13px;"><span class="rl-k" style="font-weight:600;color:var(--text);">Amount paid</span><span class="num" style="font-size:18px;">' + fmt.currency0(p.amount) + '</span></div>' +
+          '</div>' +
+          '<div class="modal-foot"><button class="btn btn-ghost" data-close>Close</button>' +
+          '<button class="btn btn-primary" data-dl>' + SI.icon("download") + 'Download receipt</button></div>';
+        var m = SI.ui.openModal(node);
+        m.querySelector("[data-dl]").addEventListener("click", function () {
+          SI.flows.downloadText("self-insure-receipt-" + p.id + ".txt", receiptText(p));
+          SI.ui.toast("Receipt " + p.id + " downloaded.");
+        });
+      }
+      function receiptText(p) {
+        return "SELF-INSURE — PAYMENT RECEIPT\n\n" +
+          "Receipt no.: " + p.id + "\n" +
+          "Date: " + fmt.date(p.date) + "\n" +
+          "Policy: " + A.policy.number + "\n" +
+          "Description: Homeowners premium\n" +
+          "Method: " + p.method + "\n" +
+          "Status: " + p.status + "\n" +
+          "Amount paid: " + fmt.currency0(p.amount) + "\n\n" +
+          "Thank you. the insurance that gives it back.\n";
+      }
+
+      /* annual statement */
+      document.getElementById("annual-stmt-btn").addEventListener("click", function () {
+        var node = document.createElement("div");
+        var year = 2026, paidThisYear = SI.allPayments().filter(function (p) { return p.date.indexOf(String(year)) === 0; });
+        var total = paidThisYear.reduce(function (s, p) { return s + p.amount; }, 0);
+        node.innerHTML =
+          '<div class="modal-head"><div class="modal-title">Annual statement · ' + year + '</div>' +
+          '<button class="modal-close" data-close aria-label="Close">' + SI.icon("x") + '</button></div>' +
+          '<div class="modal-body">' +
+            '<div class="receipt-line"><span class="rl-k">Policy</span><span class="rl-v">' + A.policy.number + '</span></div>' +
+            '<div class="receipt-line"><span class="rl-k">Member</span><span class="rl-v">' + A.member.fullName + '</span></div>' +
+            '<div class="receipt-line"><span class="rl-k">Annual premium</span><span class="rl-v">' + fmt.currency0(B.premiumAnnual) + '</span></div>' +
+            '<div class="receipt-line"><span class="rl-k">Paid year-to-date</span><span class="rl-v">' + fmt.currency0(total) + '</span></div>' +
+            '<div class="receipt-line"><span class="rl-k">Paid since inception</span><span class="rl-v">' + fmt.currency0(B.paidToDate) + '</span></div>' +
+            '<div class="receipt-line"><span class="rl-k">ROP on track</span><span class="rl-v" style="color:var(--ai);">' + fmt.currency0(A.rop.bronzeReturnAmount) + ' at year 10</span></div>' +
+          '</div>' +
+          '<div class="modal-foot"><button class="btn btn-ghost" data-close>Close</button>' +
+          '<button class="btn btn-primary" data-dl>' + SI.icon("download") + 'Download PDF</button></div>';
+        var m = SI.ui.openModal(node);
+        m.querySelector("[data-dl]").addEventListener("click", function () {
+          SI.flows.downloadText("self-insure-statement-" + year + ".txt",
+            "SELF-INSURE — ANNUAL STATEMENT " + year + "\n\nPolicy: " + A.policy.number + "\nMember: " + A.member.fullName +
+            "\nAnnual premium: " + fmt.currency0(B.premiumAnnual) + "\nPaid year-to-date: " + fmt.currency0(total) +
+            "\nPaid since inception: " + fmt.currency0(B.paidToDate) + "\nROP: " + fmt.currency0(A.rop.bronzeReturnAmount) + " on track at year 10\n");
+          SI.ui.toast("Annual statement downloaded.");
+        });
+      });
+
+      /* ============================================================
+         PAPERLESS TOGGLE
+         ============================================================ */
+      var paperless = document.getElementById("paperless-toggle");
+      document.getElementById("paperless-email").textContent = A.member.email;
+      paperless.checked = st().paperless;
+      paperless.addEventListener("change", function () {
+        SI.state.patch("paperless", paperless.checked);
+        if (paperless.checked) SI.ui.toast("Paperless on — statements go to " + A.member.email + ".", "ai", { title: "Paperless on" });
+        else SI.ui.toast("Paperless off — we'll mail paper statements to your address.", "info", { title: "Paperless off" });
+      });
+
+      /* ============================================================
+         AI insight chips → open assistant dock pre-seeded
+         ============================================================ */
+      document.querySelectorAll("[data-ask]").forEach(function (b) {
+        b.addEventListener("click", function () { SI.assistant.send(b.getAttribute("data-ask")); });
+      });
+
+      /* deep-link #autopay: gently flash the autopay card */
+      if (location.hash === "#autopay") {
+        var apCard = document.getElementById("autopay");
+        if (apCard) {
+          apCard.scrollIntoView({ behavior: "smooth", block: "center" });
+          apCard.style.transition = "box-shadow .4s var(--ease)";
+          apCard.style.boxShadow = "0 0 0 3px var(--ai-tint)";
+          setTimeout(function () { apCard.style.boxShadow = ""; }, 1400);
+        }
+      }
+    });
+  </script>
+</body>
+</html>
