@@ -1,0 +1,830 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Self-Insure — Team &amp; Operations</title>
+<meta name="description" content="The operational depth behind Self-Insure: an AI-native underwriting pipeline, an 84% combined ratio at scale, a 10,000-run Monte Carlo risk engine, an RBC>300% capital structure with a Month-24 investor gate, the two-track ROP reserve plan, and the founding team the seed funds.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="styles.css">
+<style>
+  /* ── page-UNIQUE components only — composed from the system tokens, no competing palette.
+     Shared primitives (.sub-rail, .lede, .two-col, .stat-grid-4, margin utilities, .lbl,
+     .ladder, .gate-band, .cov-band, .uof-row, .arc-flow) live once in styles.css; do NOT
+     re-declare them here. Only the pipeline / roster / agent-row below are team-specific. ── */
+
+  /* ── AI underwriting pipeline (data → underwrite → quote → bind) ── */
+  .pipeline { display: grid; grid-template-columns: 1fr auto 1fr auto 1fr auto 1fr; align-items: stretch;
+    gap: 0.75rem; margin-top: 2rem; }
+  .pipe-step { background: var(--surface); border: 1px solid var(--border); border-radius: 2px;
+    padding: 1.5rem 1.25rem; text-align: center; transition: border-color 0.3s, background 0.3s; }
+  .pipe-step:hover { border-color: var(--border-accent); background: var(--surface2); }
+  .pipe-step .ps-n { font-size: 0.6rem; text-transform: uppercase; letter-spacing: 0.14em;
+    color: var(--text-tertiary); font-weight: 500; margin-bottom: 0.85rem; }
+  .pipe-step .ps-t { font-family: var(--serif); font-size: 2rem; color: var(--gold); font-weight: 500; line-height: 1; }
+  .pipe-step .ps-t small { font-family: var(--serif); font-size: 1rem; color: var(--gold-dim); }
+  .pipe-step .ps-h { font-size: 0.82rem; color: var(--text); font-weight: 500; margin-top: 0.7rem; }
+  .pipe-step .ps-d { font-size: 0.72rem; color: var(--text-tertiary); line-height: 1.55; margin-top: 0.4rem; }
+  .pipe-arrow { display: flex; align-items: center; justify-content: center; color: var(--gold-dim); font-size: 1.1rem; }
+  @media (max-width: 880px) {
+    .pipeline { grid-template-columns: 1fr; }
+    .pipe-arrow { transform: rotate(90deg); padding: 0.1rem 0; }
+  }
+
+  /* cost ladder (.ladder / .ladder-row) is the canonical component in styles.css */
+
+  /* ── org / founding-team roster ── */
+  .roster { display: grid; grid-template-columns: repeat(2, 1fr); gap: 1px;
+    background: var(--border); border: 1px solid var(--border); border-radius: 2px; overflow: hidden; }
+  @media (max-width: 768px) { .roster { grid-template-columns: 1fr; } }
+  .role { background: var(--surface); padding: 1.75rem 1.75rem; transition: background 0.3s; }
+  .role:hover { background: var(--surface2); }
+  .role-head { display: flex; align-items: baseline; justify-content: space-between; gap: 0.75rem; }
+  .role-title { font-family: var(--serif); font-size: 1.2rem; font-weight: 500; color: var(--text); }
+  .role-mandate { font-size: 0.72rem; color: var(--text-secondary); line-height: 1.65; margin-top: 0.65rem; }
+  .role-owns { font-size: 0.7rem; color: var(--gold); font-weight: 500; margin-top: 0.7rem; }
+  .role .pill { margin-top: 0.1rem; }
+
+  /* The Month-24 .gate-band and the trust-coverage .cov-band are the single shared
+     definitions in styles.css (used identically here and on investor.html). */
+
+  /* ── stack-of-agents list ── */
+  .agent-row { display: grid; grid-template-columns: 1.3fr 0.9fr; gap: 1rem; align-items: baseline;
+    padding: 0.8rem 0; border-bottom: 1px solid var(--border); }
+  .agent-row:last-child { border-bottom: none; }
+  .agent-row .ar-k { font-size: 0.86rem; color: var(--text); }
+  .agent-row .ar-k small { display: block; font-size: 0.72rem; color: var(--text-tertiary); margin-top: 1px; }
+  .agent-row .ar-v { font-family: var(--serif); font-size: 0.95rem; color: var(--gold); text-align: right;
+    font-variant-numeric: tabular-nums; }
+  .agent-row .ar-v.human { color: var(--text-secondary); }
+</style>
+</head>
+<body>
+
+<!-- ═══════════════════════ PERSISTENT TOP NAV ═══════════════════════ -->
+<nav class="nav">
+  <a class="wm" href="index.html">Self-Insure<span class="tag">The Insurance That Gives It Back</span></a>
+  <div class="nav-links">
+    <a href="index.html">Overview</a>
+    <a href="investor.html">Investor</a>
+    <a href="app.html">Client App</a>
+    <a href="team.html">Team</a>
+    <a href="https://self-insure-portal.vercel.app" target="_blank" rel="noopener" style="color:var(--gold);">Live app ↗</a>
+  </div>
+</nav>
+
+<!-- ═══════════════════════ I · HERO ═══════════════════════ -->
+<header class="hero" id="top">
+  <div class="wordmark">Self-Insure<span class="dot"> · </span><em style="font-style:italic;color:var(--text-secondary);font-size:0.65em;">The Insurance That Gives It Back</em></div>
+  <div class="hero-label">Team &amp; Operations — Confidential Seed Briefing — June 2026</div>
+  <h1>The machine behind <em>the money back</em>.</h1>
+  <p class="sub">An AI-native carrier is not a website on top of an old insurer — it is a different operating system. Same-day underwriting, an 84% combined ratio at scale, a 10,000-run risk engine, and a capital structure that hands money back if the plan misses.</p>
+
+  <p class="arc">
+    <strong>&lt;3s</strong> to aggregate &nbsp;→&nbsp;
+    <strong>&lt;30s</strong> to underwrite &nbsp;→&nbsp;
+    <strong>&lt;2min</strong> to quote &nbsp;→&nbsp;
+    <strong>same-day</strong> to bind.
+  </p>
+
+  <div class="metrics">
+    <div class="metric">
+      <span class="v color-gold">84%</span>
+      <span class="l">Combined Ratio at Scale</span>
+      <span class="src">Proforma v03 · vs ~99% industry</span>
+    </div>
+    <div class="metric">
+      <span class="v color-pos">60–70%</span>
+      <span class="l">Staff Replaced by AI Agents</span>
+      <span class="src">Operating-model assumption — to validate</span>
+    </div>
+    <div class="metric">
+      <span class="v">10,000</span>
+      <span class="l">Monte Carlo Runs</span>
+      <span class="src">Risk analysis v02, May 2026</span>
+    </div>
+    <div class="metric">
+      <span class="v color-gold">&gt;300%</span>
+      <span class="l">RBC Maintained</span>
+      <span class="src">Proforma v03 · 4.2% insolvency risk</span>
+    </div>
+  </div>
+
+  <div class="sub-rail">
+    <a href="#engine">I · AI Engine</a><span class="sep">·</span>
+    <a href="#agents">II · The Agents</a><span class="sep">·</span>
+    <a href="#unit">III · Unit Economics</a><span class="sep">·</span>
+    <a href="#risk">IV · Risk Engine</a><span class="sep">·</span>
+    <a href="#capital">V · Capital &amp; Solvency</a><span class="sep">·</span>
+    <a href="#reserve">VI · Reserve Plan</a><span class="sep">·</span>
+    <a href="#team">VII · Founding Team</a><span class="sep">·</span>
+    <a href="#scale">VIII · Scale Trajectory</a>
+  </div>
+
+  <div class="scroll-line"></div>
+</header>
+
+<!-- ═══════════════════════ I · THE AI-NATIVE ENGINE ═══════════════════════ -->
+<section class="section section--wide" id="engine">
+  <div class="sn">I</div>
+  <h2 class="st">The underwriting pipeline runs in a single session — not three to five days.</h2>
+  <p class="sd sd--wide">The whole quote-to-bind cycle is a four-stage automated pipeline: data aggregation in under three seconds, AI underwriting in under thirty, a bindable quote in under two minutes, and a same-day bind — against a 3–5 day industry standard (Self-Insure operating model, May 2026). Speed is not a feature here; it is the cost structure and the conversion rate.</p>
+  <div class="rule"></div>
+
+  <div class="pipeline">
+    <div class="pipe-step">
+      <div class="ps-n">Stage 01</div>
+      <div class="ps-t">&lt;3<small>s</small></div>
+      <div class="ps-h">Data aggregation</div>
+      <div class="ps-d">Property, peril, and applicant signals pulled and normalized from third-party sources in real time.</div>
+    </div>
+    <div class="pipe-arrow">→</div>
+    <div class="pipe-step">
+      <div class="ps-n">Stage 02</div>
+      <div class="ps-t">&lt;30<small>s</small></div>
+      <div class="ps-h">AI underwriting</div>
+      <div class="ps-d">Autonomous models price the risk and apply the rate manual — no human in the loop on the clean cases.</div>
+    </div>
+    <div class="pipe-arrow">→</div>
+    <div class="pipe-step">
+      <div class="ps-n">Stage 03</div>
+      <div class="ps-t">&lt;2<small>min</small></div>
+      <div class="ps-h">Bindable quote</div>
+      <div class="ps-d">A firm, bindable quote — including the ROP recovery schedule — returned to the applicant in under two minutes.</div>
+    </div>
+    <div class="pipe-arrow">→</div>
+    <div class="pipe-step">
+      <div class="ps-n">Stage 04</div>
+      <div class="ps-t">Same<small>-day</small></div>
+      <div class="ps-h">Bind &amp; issue</div>
+      <div class="ps-d">Policy bound and issued the same day — collapsing the industry's multi-day cycle to one sitting.</div>
+    </div>
+  </div>
+
+  <div class="two-col mt-3">
+    <div class="callout" style="margin:0">
+      <h3>Why the speed compounds</h3>
+      <p>A 3–5 day cycle is an artifact of hand-offs — between aggregators, underwriters, and service desks — that an AI-native build simply does not have. Self-Insure's pipeline keeps the case inside one autonomous workflow from intake to issue. <strong>The same architecture that delivers a same-day bind is the one that runs at an 8% expense ratio</strong>: there is no separate "fast lane," only the absence of legacy headcount.</p>
+    </div>
+    <div>
+      <div class="lbl">Self-Insure vs the incumbent cycle</div>
+      <div class="table-wrap">
+        <table class="data-table data-table--compact">
+          <thead><tr><th>Step</th><th class="num">Self-Insure</th><th class="num">Industry</th></tr></thead>
+          <tbody>
+            <tr><td class="cat">Data aggregation</td><td class="num gold">&lt;3 sec</td><td class="num">hours–days</td></tr>
+            <tr><td class="cat">Underwriting decision</td><td class="num gold">&lt;30 sec</td><td class="num">1–3 days</td></tr>
+            <tr><td class="cat">Quote delivered</td><td class="num gold">&lt;2 min</td><td class="num">1–2 days</td></tr>
+            <tr class="row-hl"><td class="cat">Bind &amp; issue<small>full cycle</small></td><td class="num pos">Same day</td><td class="num neg">3–5 days</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <span class="source-tag" style="display:block; margin-top:0.75rem">Self-Insure operating model, May 2026. Industry cycle is a representative range; verify against carrier benchmarks.</span>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════════ II · AUTONOMOUS AGENTS ═══════════════════════ -->
+<section class="section" id="agents">
+  <div class="sn">II</div>
+  <h2 class="st">Autonomous AI agents do the work incumbents staff with people — 60–70% of it.</h2>
+  <p class="sd sd--wide">Across underwriting, claims, and service, autonomous agents are designed to replace 60–70% of the headcount a traditional insurer carries — a Self-Insure operating-model assumption (May 2026), to be validated against a staffed org plan, not yet a measured result. The human team is deliberately small and senior — actuarial judgment, regulatory ownership, exception handling, and oversight — not a call-centre. That design is the structural source of the targeted ~52.7% operating-cost advantage.</p>
+  <div class="rule"></div>
+
+  <div class="two-col flip">
+    <div>
+      <div class="lbl">Function ownership — agent vs human</div>
+      <div class="card">
+        <div class="agent-row">
+          <div class="ar-k">Risk data &amp; intake <small>aggregation, normalization, KYC</small></div>
+          <div class="ar-v">Agent-run</div>
+        </div>
+        <div class="agent-row">
+          <div class="ar-k">Underwriting — clean cases <small>pricing, rate-manual application</small></div>
+          <div class="ar-v">Agent-run</div>
+        </div>
+        <div class="agent-row">
+          <div class="ar-k">First-notice-of-loss &amp; triage <small>claims intake, routing</small></div>
+          <div class="ar-v">Agent-run</div>
+        </div>
+        <div class="agent-row">
+          <div class="ar-k">Policy service &amp; ROP tracking <small>endorsements, recovery ledger</small></div>
+          <div class="ar-v">Agent-run</div>
+        </div>
+        <div class="agent-row">
+          <div class="ar-k">Complex / disputed claims <small>adjuster review, settlement</small></div>
+          <div class="ar-v human">Human-led</div>
+        </div>
+        <div class="agent-row">
+          <div class="ar-k">Actuarial, reserving &amp; regulatory <small>certification, DOI filings</small></div>
+          <div class="ar-v human">Human-led</div>
+        </div>
+      </div>
+      <span class="source-tag" style="display:block; margin-top:0.75rem">Allocation illustrative of the operating model; agents handle volume, humans hold judgment and accountability. The 60–70% staff-replacement figure is a Self-Insure operating-model design assumption (May 2026), to be validated.</span>
+    </div>
+
+    <div>
+      <div class="lbl">What the small senior team is for</div>
+      <ul class="checklist">
+        <li><span class="mk pos">—</span><span><strong style="color:var(--text)">Exception handling, not throughput.</strong> Agents clear the clean volume; people own the edge cases, disputes, and anything that touches policyholder trust.</span></li>
+        <li><span class="mk pos">—</span><span><strong style="color:var(--text)">Accountable judgment.</strong> Actuarial sign-off, reserve adequacy, and regulatory filings stay with credentialed humans — the AI never owns the certification.</span></li>
+        <li><span class="mk pos">—</span><span><strong style="color:var(--text)">Oversight of the agents themselves.</strong> Model monitoring, drift checks, and override authority keep the autonomous stack inside its mandate.</span></li>
+        <li><span class="mk pos">—</span><span><strong style="color:var(--text)">~52.7% lower operating cost</strong> is the modelled consequence of replacing a planned 60–70% of traditional staff with this architecture — an operating-model assumption, not yet a measured result.</span></li>
+      </ul>
+
+      <div class="stat-grid-4 mt-2" style="grid-template-columns:repeat(2,1fr)">
+        <div class="stat-card">
+          <div class="sc-v pos">60–70%</div>
+          <div class="sc-l">Staff Replaced</div>
+          <div class="sc-note">by autonomous agents</div>
+        </div>
+        <div class="stat-card">
+          <div class="sc-v">~52.7%</div>
+          <div class="sc-l">Lower Operating Cost</div>
+          <div class="sc-note">proforma v03</div>
+        </div>
+        <div class="stat-card">
+          <div class="sc-v gold">8%</div>
+          <div class="sc-l">Expense Ratio</div>
+          <div class="sc-note">vs 25–30% industry</div>
+        </div>
+        <div class="stat-card">
+          <div class="sc-v">24/7</div>
+          <div class="sc-l">Quote &amp; Service</div>
+          <div class="sc-note">no shift coverage cost</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════════ III · UNIT ECONOMICS / COMBINED RATIO ═══════════════════════ -->
+<section class="section section--wide" id="unit">
+  <div class="sn">III</div>
+  <h2 class="st">84% combined ratio at scale — 55 loss + 8 LAE + 13 commission + 8 opex.</h2>
+  <p class="sd sd--wide">The unit economics are decomposed, not asserted. At scale the combined ratio is 84% — fifteen points of underwriting margin against an industry that runs near 99% (Self-Insure 10-Year Proforma v03, May 2026). The 8-point operating-expense line, against a 25–30% industry norm, is the AI-native edge made explicit. The 13-point commission is deliberate, not inherited: even a direct-first carrier funds agent and partner channels to acquire policies — the AI advantage shows up in the 8-point opex line, not by zeroing out distribution.</p>
+  <div class="rule"></div>
+
+  <div class="two-col flip mb-2">
+    <div>
+      <div class="lbl">Combined-ratio decomposition, at scale</div>
+      <div class="ladder">
+        <div class="ladder-row head">
+          <span>Component</span><span style="text-align:right">Points</span><span style="text-align:right">Read</span>
+        </div>
+        <div class="ladder-row">
+          <div class="lr-k">Loss ratio</div><div class="lr-a">55%</div><div class="lr-a color-sec" style="font-size:0.8rem">attritional, low-CAT</div>
+        </div>
+        <div class="ladder-row">
+          <div class="lr-k">Loss adjustment (LAE)</div><div class="lr-a">8%</div><div class="lr-a color-sec" style="font-size:0.8rem">AI-assisted claims</div>
+        </div>
+        <div class="ladder-row">
+          <div class="lr-k">Commission</div><div class="lr-a">13%</div><div class="lr-a color-sec" style="font-size:0.8rem">agent / partner acquisition, even direct-first</div>
+        </div>
+        <div class="ladder-row">
+          <div class="lr-k">Operating expense</div><div class="lr-a color-gold">8%</div><div class="lr-a color-sec" style="font-size:0.8rem">vs 25–30% industry</div>
+        </div>
+        <div class="ladder-row total">
+          <div class="lr-k">Combined ratio at scale</div><div class="lr-a color-pos">84%</div><div class="lr-a color-sec" style="font-size:0.8rem">Y10 ≈ 83%</div>
+        </div>
+      </div>
+      <span class="source-tag" style="display:block; margin-top:0.75rem">At-scale composition 84% = 55 loss + 8 LAE + 13 commission + 8 opex; industry ~99%. Self-Insure proforma v03.</span>
+    </div>
+
+    <div class="chart-box">
+      <div class="cb-head">
+        <span class="cb-title">The 84% Combined Ratio — Where the Points Go</span>
+        <span class="cb-meta">Proforma v03, May 2026</span>
+      </div>
+      <div class="chart-holder"><canvas id="crSplitChart"></canvas></div>
+      <div class="chart-legend">
+        <span class="legend-item"><span class="legend-dot" style="background:var(--gold)"></span>Loss 55</span>
+        <span class="legend-item"><span class="legend-dot" style="background:var(--neutral)"></span>LAE 8</span>
+        <span class="legend-item"><span class="legend-dot" style="background:rgba(155,138,106,0.85)"></span>Commission 13</span>
+        <span class="legend-item"><span class="legend-dot" style="background:rgba(107,103,96,0.85)"></span>Opex 8</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="two-col">
+    <div class="chart-box">
+      <div class="cb-head">
+        <span class="cb-title">Combined Ratio — 105% to 83% Over the Plan</span>
+        <span class="cb-meta">Proforma v03, May 2026</span>
+      </div>
+      <div class="chart-holder"><canvas id="crTrendChart"></canvas></div>
+      <div class="chart-legend">
+        <span class="legend-item"><span class="legend-dot pos"></span>Self-Insure</span>
+        <span class="legend-item"><span class="legend-dot neut"></span>U.S. industry ~99%</span>
+      </div>
+    </div>
+    <div>
+      <div class="lbl">The operating-cost edge, restated</div>
+      <p class="lede"><strong>The operating-expense line is the whole story.</strong> An incumbent spends <span class="color-neg">25–30%</span> of premium running the business. Self-Insure spends <span class="color-pos">8%</span>. That ~17–22 point swing — roughly <span class="color-gold">52.7%</span> lower operating cost — is what lets the carrier return premium to claims-free policyholders and still clear an underwriting profit. The ratio starts near 105% in Year 1 while the book is thin and fixed costs dominate, then falls below the industry line by Year 3 and reaches 83% at scale.</p>
+      <div class="kv"><span class="kv-k">Year 1 combined ratio</span><span class="kv-v">~105%</span></div>
+      <div class="kv"><span class="kv-k">Crosses below industry (~99%)</span><span class="kv-v pos">~Year 3</span></div>
+      <div class="kv"><span class="kv-k">Year 10 combined ratio</span><span class="kv-v gold">83%</span></div>
+      <div class="kv"><span class="kv-k">Underwriting margin at scale</span><span class="kv-v pos">~16 pts</span></div>
+      <span class="source-tag" style="display:block; margin-top:0.75rem">Combined-ratio path, Self-Insure proforma v03 (6 May 2026). Projection; verify with a credentialed actuary.</span>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════════ IV · THE RISK ENGINE ═══════════════════════ -->
+<section class="section section--wide" id="risk">
+  <div class="sn">IV</div>
+  <h2 class="st">The risk engine: 10,000 runs, presented as a distribution — never a single number.</h2>
+  <p class="sd sd--wide">Returns are an output of a 10,000-run Monte Carlo Risk Analysis (v02, 6 May 2026), modelled on the $100M capitalization. The honest way to read it is the full distribution: a P10 downside of 1.4×, a P50 median of 3.8× (base case 4.1×), and a P90 upside of 6.2×. The 6.2× is the top of the curve — shown here only as the upside, never as the headline.</p>
+  <div class="rule"></div>
+
+  <div class="two-col mb-2">
+    <div class="chart-box">
+      <div class="cb-head">
+        <span class="cb-title">ROIC Distribution on $100M — 10,000 Runs</span>
+        <span class="cb-meta">Monte Carlo v02, May 2026</span>
+      </div>
+      <div class="chart-holder"><canvas id="distChart"></canvas></div>
+      <div class="chart-legend">
+        <span class="legend-item"><span class="legend-dot neut"></span>P10 1.4×</span>
+        <span class="legend-item"><span class="legend-dot gold"></span>P50 3.8× / base 4.1×</span>
+        <span class="legend-item"><span class="legend-dot pos"></span>P90 6.2×</span>
+      </div>
+    </div>
+    <div>
+      <div class="lbl">The return, as a distribution</div>
+      <div class="dist-row">
+        <div class="dist-cell is-down">
+          <div class="dc-label">P10 · Downside</div>
+          <div class="dc-v">1.4&times;</div>
+          <div class="dc-sub">De-risked by the Month-24 gate</div>
+        </div>
+        <div class="dist-cell is-median">
+          <div class="dc-label">P50 · Median</div>
+          <div class="dc-v">3.8&times;</div>
+          <div class="dc-sub">Base case 4.1× · $407.1M cum. NI by Y10</div>
+        </div>
+        <div class="dist-cell is-up">
+          <div class="dc-label">P90 · Upside</div>
+          <div class="dc-v">6.2&times;</div>
+          <div class="dc-sub">Top of the curve, not a headline</div>
+        </div>
+      </div>
+      <p class="dist-caption">ROIC on the $100M capitalization. 10,000-run Monte Carlo Risk Analysis (v02, 6 May 2026). Estimates, not guarantees.</p>
+    </div>
+  </div>
+
+  <div class="two-col mt-3">
+    <div>
+      <div class="lbl">Probability of outcome — Monte Carlo v02</div>
+      <div data-fill-group>
+        <div class="bar-row">
+          <div class="br-l hi">Breakeven by Y4</div>
+          <div class="br-track"><div class="br-fill pos" data-fill="71">71%</div></div>
+        </div>
+        <div class="bar-row">
+          <div class="br-l">Full $100M recovery by Y7</div>
+          <div class="br-track"><div class="br-fill gold" data-fill="83">83%</div></div>
+        </div>
+        <div class="bar-row">
+          <div class="br-l hi">Positive at Y10</div>
+          <div class="br-track"><div class="br-fill pos" data-fill="91">91%</div></div>
+        </div>
+        <div class="bar-row">
+          <div class="br-l">Exceed $200M cumulative</div>
+          <div class="br-track"><div class="br-fill gold" data-fill="62">62%</div></div>
+        </div>
+        <div class="bar-row">
+          <div class="br-l">Regulatory insolvency (RBC&lt;200%)</div>
+          <div class="br-track"><div class="br-fill neg" data-fill="4.2">4.2%</div></div>
+        </div>
+      </div>
+      <span class="source-tag" style="display:block; margin-top:0.75rem">10,000-run Monte Carlo Risk Analysis (v02, 6 May 2026), modelled on the $100M capitalization.</span>
+    </div>
+
+    <div>
+      <div class="lbl">Stress scenarios — does it survive a bad year?</div>
+      <div class="table-wrap">
+        <table class="data-table data-table--compact">
+          <thead><tr><th>Scenario</th><th class="num">Outcome</th></tr></thead>
+          <tbody>
+            <tr><td class="cat">Breakeven by Year 4</td><td class="num pos">71%</td></tr>
+            <tr><td class="cat">Full $100M recovery by Year 7</td><td class="num gold">83%</td></tr>
+            <tr><td class="cat">Positive at Year 10</td><td class="num pos">91%</td></tr>
+            <tr><td class="cat">Exceed $200M cumulative</td><td class="num gold">62%</td></tr>
+            <tr class="row-hl"><td class="cat">1-in-25 catastrophe year<small>still positive</small></td><td class="num pos">~+$298M / 3.0&times;</td></tr>
+            <tr class="total"><td class="cat">Regulatory-insolvency risk<small>RBC&lt;200%</small></td><td class="num neg">4.2%</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <span class="source-tag" style="display:block; margin-top:0.75rem">Even a 1-in-25 catastrophe year leaves the book at roughly +$298M / 3.0×. Monte Carlo v02.</span>
+    </div>
+  </div>
+
+  <div class="callout mt-3">
+    <h3>What the 4.2% number actually says</h3>
+    <p>Across 10,000 simulated paths — varying loss frequency, severity, catastrophe timing, and rate environment — only <strong>4.2% end in regulatory insolvency</strong> (RBC falling below 200%). Read alongside the 91% probability of a positive Year-10 outcome and the bounded downside, the engine is not arguing that nothing goes wrong; it is quantifying how rarely the tail is fatal. <strong>The distribution is the product</strong> — not the 6.2× upside on its own.</p>
+  </div>
+</section>
+
+<!-- ═══════════════════════ V · CAPITAL & SOLVENCY ═══════════════════════ -->
+<section class="section section--wide" id="capital">
+  <div class="sn">V</div>
+  <h2 class="st">Capitalized to RBC&gt;300% — with a Month-24 gate that returns capital if milestones are missed.</h2>
+  <p class="sd sd--wide">The $100M is split across regulatory surplus, an investment portfolio, operating reserves, and setup; the carrier holds RBC above 300% throughout, well clear of the 200% action level. Over it sits a tri-party trust and a Month-24 investor gate — a de-facto clawback that bounds the downside before any operating result is in (Self-Insure proforma v03; trust structure).</p>
+  <div class="rule"></div>
+
+  <div class="two-col mb-2">
+    <div class="chart-box">
+      <div class="cb-head">
+        <span class="cb-title">$100M Capital Deployment</span>
+        <span class="cb-meta">Proforma v03, May 2026</span>
+      </div>
+      <div class="chart-holder"><canvas id="capChart"></canvas></div>
+      <div class="chart-legend">
+        <span class="legend-item"><span class="legend-dot gold"></span>Reg. surplus $25M</span>
+        <span class="legend-item"><span class="legend-dot neut"></span>Portfolio $40M</span>
+        <span class="legend-item"><span class="legend-dot pos"></span>Reserves $25M</span>
+        <span class="legend-item"><span class="legend-dot neg"></span>Setup / Y1 $10M</span>
+      </div>
+    </div>
+    <div>
+      <div class="lbl">Capital structure &amp; solvency policy</div>
+      <div class="kv"><span class="kv-k">Regulatory surplus</span><span class="kv-v gold">$25M</span></div>
+      <div class="kv"><span class="kv-k">Investment portfolio</span><span class="kv-v">$40M</span></div>
+      <div class="kv"><span class="kv-k">Operating reserves</span><span class="kv-v">$25M</span></div>
+      <div class="kv"><span class="kv-k">Setup &amp; Year 1</span><span class="kv-v">$10M</span></div>
+      <div class="kv"><span class="kv-k">Total capitalization</span><span class="kv-v gold">$100M</span></div>
+      <div class="kv"><span class="kv-k">RBC maintained</span><span class="kv-v pos">&gt;300%</span></div>
+      <div class="kv"><span class="kv-k">ROE target</span><span class="kv-v">10–12%</span></div>
+      <div class="kv"><span class="kv-k">Dividend policy</span><span class="kv-v" style="font-size:0.85rem">10% of prior-yr surplus, RBC-gated</span></div>
+      <span class="source-tag" style="display:block; margin-top:0.75rem">Capital plan &amp; solvency policy, Self-Insure proforma v03 (6 May 2026).</span>
+    </div>
+  </div>
+
+  <div class="gate-band mt-2">
+    <span class="pill">Month-24 Investor Gate · A De-Risker</span>
+    <h3 style="font-family:var(--serif); font-size:1.3rem; font-weight:500; color:var(--gold); margin:1rem 0 0.5rem">A de-facto clawback that sharply lowers the downside.</h3>
+    <p style="font-size:0.9rem; color:var(--text-secondary); line-height:1.8; max-width:760px">A tri-party trust holds roughly <strong style="color:var(--text)">$90M</strong>. At Month 24 the company must hit a defined set of milestones — or the trustee returns roughly <strong style="color:var(--text)">$55–70M</strong> to investors. The downside is structurally bounded before any operating result is in.</p>
+    <div class="gb-grid">
+      <div class="gb-item"><div class="gb-v">500+</div><div class="gb-l">Policies bound</div></div>
+      <div class="gb-item"><div class="gb-v">$1M+</div><div class="gb-l">Gross written premium</div></div>
+      <div class="gb-item"><div class="gb-v">≤60%</div><div class="gb-l">Loss ratio</div></div>
+      <div class="gb-item"><div class="gb-v">≥300%</div><div class="gb-l">RBC ratio</div></div>
+    </div>
+    <span class="source-tag" style="display:block; margin-top:1.5rem">Miss the Month-24 milestones and the trustee returns ~$55–70M of the ~$90M trust to investors. Tri-party trust structure; verify final terms with counsel.</span>
+  </div>
+
+  <div class="stat-grid-4 mt-2">
+    <div class="stat-card">
+      <div class="sc-v pos">&gt;300%</div>
+      <div class="sc-l">RBC Maintained</div>
+      <div class="sc-note">vs 200% action level</div>
+    </div>
+    <div class="stat-card">
+      <div class="sc-v">~$90M</div>
+      <div class="sc-l">Held in Tri-Party Trust</div>
+      <div class="sc-note">clawback at Month 24</div>
+    </div>
+    <div class="stat-card">
+      <div class="sc-v gold">~$55–70M</div>
+      <div class="sc-l">Returned if Gate Missed</div>
+      <div class="sc-note">trustee to investors</div>
+    </div>
+    <div class="stat-card">
+      <div class="sc-v neg">4.2%</div>
+      <div class="sc-l">Insolvency Risk</div>
+      <div class="sc-note">RBC&lt;200%, Monte Carlo v02</div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════════ VI · ROP RESERVE PLAN + REINSURANCE ═══════════════════════ -->
+<section class="section section--wide" id="reserve">
+  <div class="sn">VI</div>
+  <h2 class="st">The ROP reserve plan: cede first for speed, bring it in-house for margin.</h2>
+  <p class="sd sd--wide">A 30-year return-of-premium obligation is a long-duration liability with no established NAIC reserving precedent — which is exactly what blocks naive entrants and exactly the regulatory problem this team is built to solve. The plan is a two-track path: a 100% quota-share cession to a life reinsurer for fast approval, transitioning to an in-house CRVM-analog reserve by Year 3 (Self-Insure proforma v03).</p>
+  <div class="rule"></div>
+
+  <div class="two-col">
+    <div>
+      <div class="lbl">The two-track regulatory path</div>
+      <div class="timeline">
+        <div class="tl-item is-done">
+          <div class="tl-when">Years 1–3 · Option 3</div>
+          <h4>100% cession to a life reinsurer</h4>
+          <p>A 100% quota-share cession of the ROP obligation to a life reinsurer secures fast approval — roughly 5–9 months to a licensed launch — and removes the reserving question from the critical path while the book is young.</p>
+        </div>
+        <div class="tl-item">
+          <div class="tl-when">By Year 3 · Option 1</div>
+          <h4>CRVM-analog reserve, in-house</h4>
+          <p>Transitioning to an in-house CRVM-analog reserve once scaled captures the margin that ceding gives away — saving roughly <span class="color-gold">$47M</span> versus staying ceded across the plan.</p>
+        </div>
+        <div class="tl-item">
+          <div class="tl-when">Throughout</div>
+          <h4>Trust over-collateralized by design</h4>
+          <p>The supporting trust is sized to stay ahead of the ROP liability at every point — the promise to return premium is collateralized, not aspirational.</p>
+        </div>
+      </div>
+      <span class="source-tag" style="display:block; margin-top:1rem">Two-track plan, Self-Insure proforma v03. Reserving methodology to be certified by a credentialed actuary; verify with counsel.</span>
+    </div>
+
+    <div>
+      <div class="cov-band">
+        <span class="pill">Reserve Moat · No NAIC Precedent</span>
+        <h3 style="font-family:var(--serif); font-size:1.25rem; font-weight:500; color:var(--gold); margin:1rem 0 0.5rem">The trust always exceeds the obligation.</h3>
+        <p style="font-size:0.88rem; color:var(--text-secondary); line-height:1.8">By design the supporting trust stays ahead of the ROP liability. At Year 10, the trust holds roughly <strong style="color:var(--text)">$210M against a ~$101M obligation — a 2.1× coverage ratio</strong>. The reserving sophistication is itself a moat: there is no off-the-shelf NAIC treatment, so a naive entrant cannot simply copy the product.</p>
+        <div class="cov-grid">
+          <div class="cov-item"><div class="cv-v">~$210M</div><div class="cv-l">Trust at Year 10</div></div>
+          <div class="cov-item"><div class="cv-v">~$101M</div><div class="cv-l">ROP obligation, Y10</div></div>
+          <div class="cov-item"><div class="cv-v">2.1&times;</div><div class="cv-l">Coverage ratio</div></div>
+          <div class="cov-item"><div class="cv-v">5–9 mo</div><div class="cv-l">Fast-track approval</div></div>
+        </div>
+      </div>
+      <div class="stat-grid-4 mt-2" style="grid-template-columns:repeat(2,1fr)">
+        <div class="stat-card">
+          <div class="sc-v">100%</div>
+          <div class="sc-l">Quota-Share Cession</div>
+          <div class="sc-note">Years 1–3, life reinsurer</div>
+        </div>
+        <div class="stat-card">
+          <div class="sc-v pos">~$47M</div>
+          <div class="sc-l">Saved In-House by Y3</div>
+          <div class="sc-note">Option 1 transition</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════════ VII · THE FOUNDING TEAM ═══════════════════════ -->
+<section class="section" id="team">
+  <div class="sn">VII</div>
+  <h2 class="st">The four founding hires the seed funds — and the mandate each one owns.</h2>
+  <p class="sd sd--wide">$4.0M of the $15M seed builds the founding team: a Chief Actuary, CFO, CTO, and COO, plus core staff (Self-Insure use-of-funds). These are the credentialed owners the AI stack reports up to — the people who hold the actuarial certification, the capital discipline, the engineering of the underwriting engine, and the regulatory launch. Named roles and mandates; specific individuals to be confirmed.</p>
+  <div class="rule"></div>
+
+  <div class="roster">
+    <div class="role">
+      <div class="role-head">
+        <span class="role-title">Chief Actuary</span>
+        <span class="pill pill--neut">Owns the reserve moat</span>
+      </div>
+      <p class="role-mandate">Certifies the ROP reserve methodology, owns pricing and the rate manual, and signs off on reserve adequacy. The credentialed authority behind the CRVM-analog reserve and the two-track regulatory plan — the figure no AI agent can replace.</p>
+      <div class="role-owns">Owns: ROP reserving · pricing · loss-ratio discipline · actuarial certification</div>
+    </div>
+    <div class="role">
+      <div class="role-head">
+        <span class="role-title">Chief Financial Officer</span>
+        <span class="pill">Owns the capital</span>
+      </div>
+      <p class="role-mandate">Manages the $100M capital plan, the float portfolio duration-matched to the 30-year obligation, RBC above 300%, and the RBC-gated dividend policy. Owns the relationship with the tri-party trust and the Month-24 investor gate.</p>
+      <div class="role-owns">Owns: capital &amp; surplus · float portfolio · RBC &amp; solvency · investor reporting</div>
+    </div>
+    <div class="role">
+      <div class="role-head">
+        <span class="role-title">Chief Technology Officer</span>
+        <span class="pill">Owns the engine</span>
+      </div>
+      <p class="role-mandate">Builds the AI-native stack: the &lt;3s aggregation, &lt;30s underwriting, &lt;2min quote, same-day-bind pipeline, the autonomous agents that replace 60–70% of staff, and the ROP recovery ledger. Owns model monitoring, drift control, and the override architecture.</p>
+      <div class="role-owns">Owns: underwriting / claims / ROP engine · agent oversight · data &amp; security</div>
+    </div>
+    <div class="role">
+      <div class="role-head">
+        <span class="role-title">Chief Operating Officer</span>
+        <span class="pill pill--pos">Owns the launch</span>
+      </div>
+      <p class="role-mandate">Drives the regulatory path to licensure in Ohio and Wisconsin, structures the reinsurance quota-share, stands up claims and service operations, and runs go-to-market for the low-catastrophe launch states. Owns the milestones the Month-24 gate measures.</p>
+      <div class="role-owns">Owns: DOI licensure · reinsurance structuring · claims ops · GTM (OH &amp; WI)</div>
+    </div>
+  </div>
+
+  <div class="two-col mt-3">
+    <div class="callout" style="margin:0">
+      <h3>A small, senior, accountable team</h3>
+      <p>An AI-native carrier inverts the usual org chart: the automation handles volume, so the human team is deliberately <strong>small and senior</strong>. The four founding hires are not managers of large departments — they are the credentialed owners of the four things that cannot be automated: <strong>actuarial judgment, capital discipline, the engine itself, and the regulatory launch.</strong> The $4.0M team line in the seed funds exactly these seats plus core staff.</p>
+    </div>
+    <div>
+      <div class="lbl">What the team is hired to deliver — the Month-24 gate</div>
+      <ul class="checklist">
+        <li><span class="mk pos">—</span><span><strong style="color:var(--text)">500+ policies bound</strong> — the COO's launch and GTM in Ohio &amp; Wisconsin.</span></li>
+        <li><span class="mk pos">—</span><span><strong style="color:var(--text)">$1M+ gross written premium</strong> — the book taking hold on the AI pipeline.</span></li>
+        <li><span class="mk pos">—</span><span><strong style="color:var(--text)">Loss ratio ≤60%</strong> — the Chief Actuary's pricing and the anti-selection effect.</span></li>
+        <li><span class="mk pos">—</span><span><strong style="color:var(--text)">RBC ≥300%</strong> — the CFO's capital and solvency discipline.</span></li>
+      </ul>
+      <span class="source-tag" style="display:block; margin-top:0.75rem">Hit these Month-24 milestones or the trustee returns ~$55–70M to investors. Founding-team line = $4.0M of the $15M seed; roles named, individuals to be confirmed.</span>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════════ VIII · SCALE TRAJECTORY ═══════════════════════ -->
+<section class="section section--wide" id="scale">
+  <div class="sn">VIII</div>
+  <h2 class="st">The operating trajectory: $15M to build the carrier, then $1B GWP by Year 10.</h2>
+  <p class="sd sd--wide">Everything above resolves into one operating curve. The seed funds an ~18–24 month build to a licensed carrier; the carrier then scales gross written premium from $15M in Year 1 to $1.0B by Year 10 — reaching ~359k policies in force, roughly 7% of the OH+WI market — while the combined ratio falls to 83% (Self-Insure proforma v03).</p>
+  <div class="rule"></div>
+
+  <div class="two-col mb-2">
+    <div class="chart-box">
+      <div class="cb-head">
+        <span class="cb-title">Gross Written Premium — to $1B</span>
+        <span class="cb-meta">Proforma v03, May 2026</span>
+      </div>
+      <div class="chart-holder"><canvas id="gwpChart"></canvas></div>
+      <div class="chart-legend">
+        <span class="legend-item"><span class="legend-dot gold"></span>GWP ($M) — Year 9 $850M, Year 10 $1.0B</span>
+      </div>
+    </div>
+    <div class="chart-box">
+      <div class="cb-head">
+        <span class="cb-title">Cumulative Net Income — Base Case</span>
+        <span class="cb-meta">Proforma v03, May 2026</span>
+      </div>
+      <div class="chart-holder"><canvas id="cniChart"></canvas></div>
+      <div class="chart-legend">
+        <span class="legend-item"><span class="legend-dot gold"></span>Audited anchors — Y5, Y7, Y10</span>
+        <span class="legend-item"><span class="legend-dot" style="background:rgba(195,170,130,0.3)"></span>Interpolated path (base / P50)</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="table-wrap mb-2">
+    <table class="data-table data-table--compact">
+      <thead>
+        <tr><th>Year</th><th class="num">Y1</th><th class="num">Y2</th><th class="num">Y3</th><th class="num">Y4</th><th class="num">Y5</th><th class="num">Y6</th><th class="num">Y7</th><th class="num">Y8</th><th class="num">Y9</th><th class="num">Y10</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td class="cat">GWP ($M)</td>
+          <td class="num">15</td><td class="num">50</td><td class="num">100</td><td class="num">175</td><td class="num">300</td><td class="num">425</td><td class="num">550</td><td class="num">700</td><td class="num gold">850</td><td class="num gold">1,000</td>
+        </tr>
+        <tr>
+          <td class="cat">Combined ratio</td>
+          <td class="num neg">105%</td><td class="num">100%</td><td class="num">96%</td><td class="num">92%</td><td class="num">90%</td><td class="num">88%</td><td class="num">87%</td><td class="num">85%</td><td class="num pos">84%</td><td class="num pos">83%</td>
+        </tr>
+        <tr>
+          <td class="cat">Cum. net income ($M)<small>† interpolated</small></td>
+          <td class="num color-ter">-8<sup>†</sup></td><td class="num color-ter">-3<sup>†</sup></td><td class="num color-ter">6<sup>†</sup></td><td class="num color-ter">19<sup>†</sup></td><td class="num gold" style="font-weight:600">39.9</td><td class="num color-ter">84<sup>†</sup></td><td class="num gold" style="font-weight:600">141.6</td><td class="num color-ter">230<sup>†</sup></td><td class="num color-ter">312<sup>†</sup></td><td class="num gold" style="font-weight:600">407.1</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+  <p class="dist-caption mb-2">GWP, combined-ratio, and cumulative-net-income paths, Self-Insure proforma v03. Year 9 GWP is $850M; Year 10 reaches $1.0B. <strong style="color:var(--gold)">The three gold figures are the audited model anchors: cumulative net income Y5 +$39.9M, Y7 +$141.6M, Y10 +$407.1M.</strong> Cells marked † are interpolated between anchors for the curve only — not discrete model outputs. Estimates, not guarantees.</p>
+
+  <div class="stat-grid-4 mt-2">
+    <div class="stat-card">
+      <div class="sc-v gold">$1.0B</div>
+      <div class="sc-l">GWP at Year 10</div>
+      <div class="sc-note">$850M at Year 9</div>
+    </div>
+    <div class="stat-card">
+      <div class="sc-v">~359k</div>
+      <div class="sc-l">Policies in Force, Y10</div>
+      <div class="sc-note">~7% of OH+WI market</div>
+    </div>
+    <div class="stat-card">
+      <div class="sc-v pos">83%</div>
+      <div class="sc-l">Combined Ratio, Y10</div>
+      <div class="sc-note">vs ~99% industry</div>
+    </div>
+    <div class="stat-card">
+      <div class="sc-v gold">$407.1M</div>
+      <div class="sc-l">Cum. Net Income, Y10</div>
+      <div class="sc-note">base case, proforma v03</div>
+    </div>
+  </div>
+
+  <div class="dist-row mt-3">
+    <div class="dist-cell is-down">
+      <div class="dc-label">P10 · Downside</div>
+      <div class="dc-v">1.4&times;</div>
+      <div class="dc-sub">Bounded by the Month-24 investor gate</div>
+    </div>
+    <div class="dist-cell is-median">
+      <div class="dc-label">P50 · Median</div>
+      <div class="dc-v">3.8&times;</div>
+      <div class="dc-sub">Base case 4.1× · $407.1M cumulative net income by Y10</div>
+    </div>
+    <div class="dist-cell is-up">
+      <div class="dc-label">P90 · Upside</div>
+      <div class="dc-v">6.2&times;</div>
+      <div class="dc-sub">The top of the distribution</div>
+    </div>
+  </div>
+  <p class="dist-caption">The operating depth resolves into the return: $15M to build → $100M to capitalize → median 3.8×, up to 6.2×. 10,000-run Monte Carlo (v02) + 10-Year Proforma (v03), both 6 May 2026.</p>
+</section>
+
+<!-- ═══════════════════════ FOOTER ═══════════════════════ -->
+<footer class="footer">
+  <div class="cl">The machine that gives the premium back — and still clears a profit.</div>
+  <!-- closing-line register aligned to index/investor: a calm thesis statement, not a quip -->
+  <p>The operational case is the moat: an AI pipeline that binds in a day, an 84% combined ratio at scale, a 10,000-run risk engine that bounds the tail, an RBC&gt;300% capital structure with a Month-24 clawback, a two-track ROP reserve plan with no NAIC precedent, and a small senior team that owns the four things automation cannot. The depth is the point.</p>
+  <p>This material is a confidential briefing built on the Self-Insure 10-Year Proforma (v03, 6 May 2026) and Monte Carlo Risk Analysis (v02, 6 May 2026). All figures are projections and estimates, not guarantees. Combined-ratio composition, reserving methodology, and cat-model results require a credentialed actuary; trust, reinsurance, and round terms require qualified counsel. Founding-team roles are named; specific individuals are to be confirmed. Verify before any investment, regulatory, or legal decision.</p>
+  <div class="conf">Confidential — For Qualified Investor Review Only — June 2026</div>
+</footer>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script src="app.js"></script>
+<script>
+document.addEventListener('selfinsure:ready', function () {
+  if (typeof window.Chart === 'undefined') return;
+  var SI = window.SelfInsure;
+  var YRS = ['Y1','Y2','Y3','Y4','Y5','Y6','Y7','Y8','Y9','Y10'];
+
+  /* III — combined-ratio composition doughnut (55 loss + 8 LAE + 13 comm + 8 opex = 84).
+     Cost components are categorical, not semantic — so we use four neutral/tonal hues
+     (gold + dusty-blue + two desaturated golds/greys) rather than borrowing the
+     positive/negative semantic colors, which would mis-signal "commission is bad". */
+  SI.doughnutChart({
+    canvas: 'crSplitChart',
+    labels: ['Loss', 'LAE', 'Commission', 'Operating expense'],
+    data: [55, 8, 13, 8],
+    colors: [SI.PALETTE.gold, SI.PALETTE.neutral, 'rgba(155,138,106,0.85)', 'rgba(107,103,96,0.85)']
+  });
+
+  /* IV — combined ratio improving from ~105% (Y1) to 83% (Y10), vs ~99% industry */
+  SI.lineChart({
+    canvas: 'crTrendChart',
+    labels: YRS,
+    series: [
+      { label: 'Self-Insure', color: 'positive', fill: true,
+        data: [105, 100, 96, 92, 90, 88, 87, 85, 84, 83] },
+      { label: 'Industry ~99%', color: 'neutral', fill: false,
+        data: [99, 99, 99, 99, 99, 99, 99, 99, 99, 99] }
+    ],
+    yCallback: function (v) { return v + '%'; }
+  });
+
+  /* V — ROIC distribution across the percentiles (P10 1.4x · P50 3.8x · base 4.1x · P90 6.2x) */
+  SI.barChart({
+    canvas: 'distChart',
+    labels: ['P10', 'P25', 'P50', 'Base', 'P75', 'P90'],
+    series: [{ label: 'ROIC (×) on $100M', color: 'gold',
+      data: [1.4, 2.6, 3.8, 4.1, 5.0, 6.2] }],
+    yCallback: function (v) { return v + '×'; }
+  });
+
+  /* V — $100M capital deployment doughnut. Token-driven palette (no raw hex):
+     the four buckets map to the legend dots gold / neutral / positive / negative. */
+  SI.doughnutChart({
+    canvas: 'capChart',
+    labels: ['Regulatory surplus', 'Investment portfolio', 'Operating reserves', 'Setup & Year 1'],
+    data: [25, 40, 25, 10],
+    colors: [SI.PALETTE.gold, SI.PALETTE.neutral, SI.PALETTE.positive, SI.PALETTE.negative]
+  });
+
+  /* IX — GWP schedule to $1B */
+  SI.barChart({
+    canvas: 'gwpChart',
+    labels: YRS,
+    series: [{ label: 'GWP ($M)', color: 'gold',
+      data: [15, 50, 100, 175, 300, 425, 550, 700, 850, 1000] }],
+    yCallback: function (v) { return '$' + (v >= 1000 ? '1.0B' : v + 'M'); }
+  });
+
+  /* VIII — cumulative net income (base / P50). Only THREE values are audited model
+     anchors — Y5 +39.9, Y7 +141.6, Y10 +407.1 (indices 4, 6, 9). The rest are
+     interpolated for the curve. Built bespoke (not SI.lineChart) so the connecting
+     line is dimmed and visible markers sit ONLY on the anchors — the chart cannot be
+     misread as ten discrete model outputs. Uses SI.PALETTE + SI.baseScales per spec. */
+  (function () {
+    var cni = document.getElementById('cniChart');
+    if (!cni || typeof window.Chart === 'undefined') return;
+    var ANCHORS = { 4: true, 6: true, 9: true };
+    var cniData = [-8, -3, 6, 19, 39.9, 84, 141.6, 230, 312, 407.1];
+    var chart = new window.Chart(cni, {
+      type: 'line',
+      data: {
+        labels: YRS,
+        datasets: [{
+          label: 'Cumulative net income',
+          data: cniData,
+          borderColor: 'rgba(195,170,130,0.45)',          /* dimmed connecting line */
+          backgroundColor: 'rgba(195,170,130,0.10)',
+          fill: true, tension: 0.3, borderWidth: 2,
+          pointRadius: function (c) { return ANCHORS[c.dataIndex] ? 5 : 0; },
+          pointHoverRadius: function (c) { return ANCHORS[c.dataIndex] ? 6 : 3; },
+          pointBackgroundColor: function (c) { return ANCHORS[c.dataIndex] ? SI.PALETTE.gold : 'transparent'; },
+          pointBorderColor: SI.PALETTE.bg, pointBorderWidth: 1.5
+        }]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        interaction: { mode: 'index', intersect: false },
+        scales: SI.baseScales({ yCallback: function (v) { return (v < 0 ? '-$' : '$') + Math.abs(v) + 'M'; } }),
+        plugins: {
+          legend: { display: false },
+          tooltip: { callbacks: { label: function (c) {
+            var v = c.parsed.y;
+            return (ANCHORS[c.dataIndex] ? 'Anchor: ' : 'Interpolated: ') + (v < 0 ? '-$' : '$') + Math.abs(v) + 'M';
+          } } }
+        }
+      }
+    });
+    cni._selfInsureChart = chart;
+    if (SI.markRendered) SI.markRendered(cni);
+  })();
+});
+</script>
+</body>
+</html>
