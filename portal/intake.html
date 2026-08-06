@@ -1,0 +1,820 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Get a quote · Self-Insure</title>
+  <script src="theme.js"></script>
+  <link rel="stylesheet" href="styles.css" />
+  <style>
+    /* ---- intake-scoped layout (composed from shared primitives) ---- */
+    .qz {
+      display: grid;
+      grid-template-columns: 232px minmax(0, 1fr) 320px;
+      gap: 24px;
+      align-items: start;
+    }
+    /* left rail stepper */
+    .qz-rail { position: sticky; top: calc(var(--topbar-h) + 28px); }
+    .qz-rail .wstep { cursor: pointer; }
+    .qz-rail .wstep[aria-disabled="true"] { cursor: default; opacity: .55; }
+    .qz-rail .wstep .wstep-sub { font-size: 11px; color: var(--text-3); font-weight: 500; }
+    .qz-rail .wstep.active .wstep-sub, .qz-rail .wstep.done .wstep-sub { color: var(--text-2); }
+    .qz-rail .wstep-meta { display: flex; flex-direction: column; min-width: 0; line-height: 1.25; }
+    .rail-help {
+      margin-top: 16px; padding: 14px; border-radius: var(--r-card);
+      background: var(--ai-tint); border: 1px solid var(--ai-border);
+    }
+    .rail-help .rh-head { display: flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 600; color: var(--ai); }
+    .rail-help .rh-head svg { width: 15px; height: 15px; }
+    .rail-help p { font-size: 12px; color: var(--text-2); margin-top: 7px; line-height: 1.5; }
+
+    /* center panel */
+    .qz-panel { min-height: 360px; }
+    .step-eyebrow { display: flex; align-items: center; gap: 9px; margin-bottom: 6px; }
+    .step-eyebrow .se-count { font-size: 11.5px; font-weight: 600; letter-spacing: .04em; color: var(--ai); text-transform: uppercase; }
+    .step-h { font-family: var(--font-display); font-size: 26px; font-weight: 600; color: var(--text); letter-spacing: -0.01em; }
+    .step-sub { color: var(--text-2); margin-top: 4px; font-size: 13.5px; }
+
+    .panel-body { animation: stepIn .32s var(--ease); }
+    @keyframes stepIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+
+    .grid-2col { display: grid; grid-template-columns: 1fr 1fr; gap: 0 16px; }
+    .grid-3col { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 0 16px; }
+    @media (max-width: 560px) { .grid-2col, .grid-3col { grid-template-columns: 1fr; } }
+    .span-2 { grid-column: span 2; }
+
+    /* coverage derived list */
+    .cov-derived { display: flex; flex-direction: column; gap: 2px; }
+    .cov-row { display: flex; align-items: center; gap: 11px; padding: 11px 0; border-bottom: 1px solid var(--border-2); }
+    .cov-row:last-child { border-bottom: 0; }
+    .cov-row .cov-name { flex: 1; min-width: 0; }
+    .cov-row .cov-name .cov-t { font-size: 13.5px; font-weight: 500; color: var(--text); }
+    .cov-row .cov-name .cov-b { font-size: 11.5px; color: var(--text-3); }
+    .cov-row .cov-amt { font-family: var(--font-display); font-weight: 500; font-size: 15px; color: var(--brand); font-variant-numeric: tabular-nums; }
+    .cov-row.is-auto .cov-amt { color: var(--text-2); }
+
+    .slider-readout { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 10px; }
+    .slider-readout .sr-val { font-family: var(--font-display); font-size: 30px; font-weight: 500; color: var(--brand); letter-spacing: -0.01em; }
+    .slider-ticks { display: flex; justify-content: space-between; font-size: 11px; color: var(--text-3); margin-top: 7px; }
+
+    /* ROP tier cards */
+    .tier-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; }
+    @media (max-width: 700px) { .tier-grid { grid-template-columns: 1fr; } }
+    .tier-card {
+      position: relative; text-align: left; cursor: pointer;
+      background: var(--surface-2); border: 1.5px solid var(--border);
+      border-radius: var(--r-card); padding: 16px 15px;
+      transition: border-color .15s var(--ease), background .15s, transform .12s, box-shadow .15s;
+    }
+    .tier-card:hover { border-color: var(--ai-border); transform: translateY(-2px); }
+    .tier-card.sel { border-color: var(--ai); background: var(--ai-tint); box-shadow: 0 0 0 3px var(--ai-tint); }
+    .tier-card .tier-name { font-size: 13px; font-weight: 700; color: var(--text); display: flex; align-items: center; gap: 7px; }
+    .tier-card .tier-pct { font-family: var(--font-display); font-size: 30px; font-weight: 600; color: var(--brand); line-height: 1; margin: 8px 0 2px; }
+    .tier-card.sel .tier-pct { color: var(--ai); }
+    .tier-card .tier-term { font-size: 11.5px; color: var(--text-3); }
+    .tier-card .tier-back { margin-top: 11px; padding-top: 11px; border-top: 1px solid var(--border-2); font-size: 12px; color: var(--text-2); }
+    .tier-card .tier-back b { font-family: var(--font-display); font-weight: 600; color: var(--text); font-size: 14px; }
+    .tier-card .tier-radio {
+      position: absolute; top: 14px; right: 14px; width: 18px; height: 18px; border-radius: 50%;
+      border: 2px solid var(--border); display: grid; place-items: center; transition: all .15s var(--ease);
+    }
+    .tier-card.sel .tier-radio { border-color: var(--ai); background: var(--ai); }
+    .tier-card.sel .tier-radio::after { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--ai-ink); }
+
+    /* Light-theme WCAG AA fix for the lowest-contrast tier elements. The global
+       --ai (#0f9d63) as small text on an --ai-tint card is only ~3.1:1; bump the
+       small "Popular" pill to a solid deep-green fill (white text ≈ 5.4:1) and the
+       selected big % to a deeper green (≈ 4.7:1 on the tint). Scoped to this page
+       and to light mode only — the global signature color is untouched. */
+    [data-theme="light"] .tier-card .tier-name .pill-ai {
+      background: #0a7a49; color: #ffffff; border-color: #0a7a49;
+    }
+    [data-theme="light"] .tier-card .tier-name .pill-ai .dot {
+      background: #ffffff; box-shadow: none;
+    }
+    [data-theme="light"] .tier-card.sel .tier-pct { color: #0a7a49; }
+
+    /* coverage explainer expander */
+    .explain { border: 1px solid var(--border); border-radius: var(--r-ctrl); overflow: hidden; margin-top: 16px; background: var(--surface-2); }
+    .explain summary { list-style: none; cursor: pointer; padding: 12px 14px; font-size: 12.5px; font-weight: 600; color: var(--text-2); display: flex; align-items: center; gap: 8px; }
+    .explain summary::-webkit-details-marker { display: none; }
+    .explain summary .chev { margin-left: auto; transition: transform .2s var(--ease); width: 14px; height: 14px; color: var(--text-3); }
+    .explain[open] summary .chev { transform: rotate(90deg); }
+    .explain .explain-body { padding: 0 14px 14px; font-size: 12.5px; color: var(--text-2); line-height: 1.55; }
+    .explain .explain-body .eb-line { display: flex; gap: 9px; padding: 5px 0; }
+    .explain .explain-body .eb-line .code-chip { width: 22px; height: 22px; flex: 0 0 22px; font-size: 12px; }
+
+    /* review */
+    .review-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+    @media (max-width: 640px) { .review-grid { grid-template-columns: 1fr; } }
+    .review-block { background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--r-card); padding: 16px; }
+    .review-block .rb-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 11px; }
+    .review-block .rb-title { font-size: 11px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--text-3); }
+    .review-block .rb-edit { font-size: 12px; font-weight: 600; color: var(--ai); background: transparent; border: 0; }
+    .review-block .rb-edit:hover { text-decoration: underline; }
+
+    /* sticky footer */
+    .qz-foot {
+      display: flex; align-items: center; gap: 12px;
+      margin-top: 24px; padding-top: 20px; border-top: 1px solid var(--border);
+    }
+    .qz-foot .foot-spacer { flex: 1; }
+
+    /* right quote rail */
+    .quote-rail { position: sticky; top: calc(var(--topbar-h) + 28px); }
+    .quote-rail .qr-eyebrow { display: flex; align-items: center; gap: 7px; font-size: 11px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--text-3); }
+    .quote-rail .qr-eyebrow svg { width: 14px; height: 14px; color: var(--ai); }
+    .qr-premium { display: flex; align-items: baseline; gap: 8px; margin: 10px 0 2px; }
+    .qr-premium .qrp-num { font-family: var(--font-display); font-size: 40px; font-weight: 600; color: var(--brand); line-height: 1; letter-spacing: -0.015em; transition: color .2s; }
+    .qr-premium .qrp-unit { font-size: 13px; color: var(--text-2); font-weight: 500; }
+    .qr-mo { font-size: 13px; color: var(--text-2); }
+    .qr-mo b { font-family: var(--font-display); color: var(--text); font-weight: 600; }
+    .qr-line { display: flex; align-items: center; justify-content: space-between; padding: 9px 0; border-bottom: 1px solid var(--border-2); font-size: 12.5px; }
+    .qr-line:last-of-type { border-bottom: 0; }
+    .qr-line .qr-k { color: var(--text-2); }
+    .qr-line .qr-v { font-weight: 600; color: var(--text); text-align: right; }
+    .qr-trust { display: flex; gap: 8px; align-items: flex-start; margin-top: 14px; font-size: 11.5px; color: var(--text-2); line-height: 1.5; }
+    .qr-trust .qrt-ico { width: 26px; height: 26px; flex: 0 0 26px; border-radius: 8px; background: var(--ai-tint); color: var(--ai); display: grid; place-items: center; }
+    .qr-trust .qrt-ico svg { width: 15px; height: 15px; }
+
+    /* responsive: collapse rails */
+    @media (max-width: 1080px) {
+      .qz { grid-template-columns: 1fr; }
+      .qz-rail { position: static; }
+      .qz-rail .wizard-steps { flex-direction: row; overflow-x: auto; gap: 6px; padding-bottom: 4px; }
+      .qz-rail .wstep { flex: 1 0 auto; }
+      .qz-rail .wstep .wstep-sub { display: none; }
+      .rail-help { display: none; }
+      .quote-rail { position: static; order: 3; }
+    }
+    .field.compact { margin-bottom: 14px; }
+    .demo-fill { font-size: 12px; font-weight: 600; color: var(--ai); background: transparent; border: 0; padding: 0; }
+    .demo-fill:hover { text-decoration: underline; }
+    .auto-fill-btn { margin-bottom: 14px; }
+  </style>
+  <link rel="icon" type="image/svg+xml" href="favicon.svg">
+</head>
+<body>
+  <div data-content data-wide data-shell="minimal">
+
+    <!-- Header -->
+    <div class="section" style="margin-bottom:22px;">
+      <div class="step-eyebrow" style="margin-bottom:4px;">
+        <span class="pill pill-ai"><span class="dot"></span>AI-underwritten</span>
+        <span class="pill">Ohio &amp; Wisconsin</span>
+      </div>
+      <h2 class="display" style="font-size:30px;">Get your instant quote.</h2>
+      <p class="muted" style="margin-top:4px;">
+        A few quick details and our model prices your home in under a minute — no calls, no waiting.
+      </p>
+    </div>
+
+    <div class="qz">
+
+      <!-- LEFT: stepper rail -->
+      <aside class="qz-rail">
+        <nav class="wizard-steps" id="rail" aria-label="Quote steps"></nav>
+        <div class="rail-help">
+          <div class="rh-head">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l1.6 4.6L18 9l-4.4 1.4L12 15l-1.6-4.6L6 9l4.4-1.4z"/></svg>
+            Why so fast?
+          </div>
+          <p>We aggregate ~140 property data points and underwrite with our AI model in seconds — not the 3–5 days you're used to.</p>
+        </div>
+      </aside>
+
+      <!-- CENTER: panel -->
+      <main class="qz-panel">
+        <div class="card pad-lg" style="min-height:420px;display:flex;flex-direction:column;">
+          <div id="panel" style="flex:1;"></div>
+
+          <!-- footer -->
+          <div class="qz-foot">
+            <button class="btn btn-ghost" id="btn-back">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5M11 5l-7 7 7 7"/></svg>
+              Back
+            </button>
+            <div class="foot-spacer"></div>
+            <span class="tiny muted-3" id="autosave-note" style="margin-right:4px;">Draft saved</span>
+            <button class="btn btn-primary" id="btn-next">
+              Continue
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 5l7 7-7 7"/></svg>
+            </button>
+          </div>
+        </div>
+      </main>
+
+      <!-- RIGHT: live quote rail -->
+      <aside class="quote-rail">
+        <div class="card card-ai">
+          <div class="qr-eyebrow">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l1.6 4.6L18 9l-4.4 1.4L12 15l-1.6-4.6L6 9l4.4-1.4z"/></svg>
+            Your estimate
+          </div>
+          <div class="qr-premium">
+            <!-- Values are populated by updateRail() on first render (runs in render()).
+                 Never hand-type formatted money here — it would flash stale if a
+                 loaded draft or a changed default has different figures. -->
+            <span class="qrp-num" id="qr-annual">&nbsp;</span>
+            <span class="qrp-unit">/ year</span>
+          </div>
+          <div class="qr-mo">or <b id="qr-monthly">&nbsp;</b> / month</div>
+
+          <div style="margin-top:16px;">
+            <div class="qr-line"><span class="qr-k">Dwelling coverage</span><span class="qr-v" id="qr-dwelling">&nbsp;</span></div>
+            <div class="qr-line"><span class="qr-k">All-perils deductible</span><span class="qr-v" id="qr-deductible">&nbsp;</span></div>
+            <div class="qr-line"><span class="qr-k">Return of Premium</span><span class="qr-v" id="qr-rop">&nbsp;</span></div>
+            <div class="qr-line"><span class="qr-k" id="qr-rop-when-k">You'd get back</span><span class="qr-v ai-text" id="qr-rop-amt">&nbsp;</span></div>
+          </div>
+
+          <div class="qr-trust">
+            <span class="qrt-ico">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+            </span>
+            <span>AI-underwritten · same-day decision in under a minute. This estimate is finalized when you get your decision.</span>
+          </div>
+        </div>
+
+        <button class="btn btn-ai-ghost btn-block btn-sm" id="qr-ask" style="margin-top:12px;">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l1.6 4.6L18 9l-4.4 1.4L12 15l-1.6-4.6L6 9l4.4-1.4z"/></svg>
+          Ask about my quote
+        </button>
+      </aside>
+
+    </div>
+  </div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+  <script src="account.js"></script>
+  <script src="intents.js"></script>
+  <script src="app.js"></script>
+  <script>
+    document.addEventListener("selfinsure:ready", function () {
+      var fmt = SI.fmt;
+      var DRAFT_KEY = "si-quote-draft";
+
+      /* ---------- draft load / seed ---------- */
+      function deepCopy(o) { return JSON.parse(JSON.stringify(o)); }
+      function loadDraft() {
+        try {
+          var raw = sessionStorage.getItem(DRAFT_KEY);
+          if (raw) {
+            var d = JSON.parse(raw);
+            // shallow-merge over defaults so new fields never break an old draft
+            var base = deepCopy(SI.quoteDraftDefault);
+            base.step = d.step || 1;
+            Object.assign(base.applicant, d.applicant || {});
+            Object.assign(base.property, d.property || {});
+            Object.assign(base.coverageSelections, d.coverageSelections || {});
+            return base;
+          }
+        } catch (e) {}
+        return deepCopy(SI.quoteDraftDefault);
+      }
+      var draft = loadDraft();
+      var maxVisited = draft.step || 1;
+
+      function saveDraft() {
+        try { sessionStorage.setItem(DRAFT_KEY, JSON.stringify(draft)); } catch (e) {}
+        flashSaved();
+      }
+      var saveTimer;
+      function flashSaved() {
+        var n = document.getElementById("autosave-note");
+        n.textContent = "Saving…"; n.style.opacity = ".7";
+        clearTimeout(saveTimer);
+        saveTimer = setTimeout(function () { n.textContent = "Draft saved"; n.style.opacity = ""; }, 450);
+      }
+
+      /* ---------- step metadata ---------- */
+      var STEPS = [
+        { n: 1, title: "About you",        sub: "Contact details" },
+        { n: 2, title: "Your home",        sub: "Property basics" },
+        { n: 3, title: "Coverage",         sub: "Limits & deductible" },
+        { n: 4, title: "Return of Premium",sub: "Choose your tier" },
+        { n: 5, title: "Review & quote",   sub: "Confirm and decide" }
+      ];
+
+      /* ---------- premium engine (believable, clamped) ---------- */
+      function recalcPremium() {
+        var base = 1500;
+        var sel = draft.coverageSelections;
+        // dwelling delta from the $400k baseline: ~$1.8 per $1k of coverage
+        var dwellingDelta = (sel.dwelling - 400000) / 1000 * 1.8;
+        // deductible effect
+        var dedAdj = sel.deductible === 1000 ? 90 : sel.deductible === 2500 ? -120 : 0;
+        // roof age nudges (older roof = small load)
+        var roofAge = 2026 - (draft.property.roofYear || 2018);
+        var roofAdj = roofAge > 20 ? 110 : roofAge > 12 ? 45 : 0;
+        // construction
+        var constructionAdj = draft.property.constructionType === "Masonry" || draft.property.constructionType === "Brick" ? -55 : 0;
+        var p = base + dwellingDelta + dedAdj + roofAdj + constructionAdj;
+        // Brand band ≈ $1,500/yr. The dwelling slider ($310K→$490K) maps to exactly
+        // 1350→1650 on its own, so the live headline moves across the ENTIRE drag —
+        // no fake flatline — and lands inside the same band the underwriting decision
+        // uses, so the rail number and the climactic quote always agree.
+        p = Math.max(1350, Math.min(1650, p));
+        return Math.round(p / 5) * 5; // tidy to $5
+      }
+      function ropReturn(annual) {
+        var t = TIERS[draft.coverageSelections.ropTier];
+        return Math.round(annual * t.term * (t.pct / 100));
+      }
+      var TIERS = {
+        bronze: { key: "bronze", name: "Bronze", pct: 50,  term: 10 },
+        silver: { key: "silver", name: "Silver", pct: 75,  term: 20 },
+        gold:   { key: "gold",   name: "Gold",   pct: 100, term: 30 }
+      };
+
+      /* derived coverage amounts from dwelling (standard HO-3 ratios) */
+      function derivedCoverages(dwelling) {
+        return [
+          { code: "A", name: "Dwelling",          amount: dwelling,                       blurb: "Rebuilds your home's structure", auto: false },
+          { code: "B", name: "Other structures",  amount: Math.round(dwelling * 0.10),    blurb: "10% of dwelling — shed, fence, detached garage", auto: true },
+          { code: "C", name: "Personal property", amount: Math.round(dwelling * 0.50),    blurb: "50% of dwelling — your belongings", auto: true },
+          { code: "D", name: "Loss of use",       amount: Math.round(dwelling * 0.20),    blurb: "20% of dwelling — living expenses", auto: true },
+          { code: "E", name: "Liability",         amount: 300000,                          blurb: "Standard liability protection", auto: true },
+          { code: "F", name: "Medical payments",  amount: 5000,                            blurb: "Guest medical bills", auto: true }
+        ];
+      }
+
+      /* ---------- live quote rail ---------- */
+      function updateRail() {
+        var annual = recalcPremium();
+        var monthly = Math.round(annual / 12);
+        var sel = draft.coverageSelections;
+        var tier = TIERS[sel.ropTier];
+        var qa = document.getElementById("qr-annual");
+        qa.textContent = fmt.currency0(annual);
+        // brief tint flash on change
+        qa.style.color = "var(--ai)";
+        setTimeout(function () { qa.style.color = ""; }, 260);
+        document.getElementById("qr-monthly").textContent = fmt.currency0(monthly);
+        document.getElementById("qr-dwelling").textContent = fmt.currency0(sel.dwelling);
+        document.getElementById("qr-deductible").textContent = fmt.currency0(sel.deductible);
+        document.getElementById("qr-rop").textContent = tier.name + " · " + tier.pct + "%";
+        document.getElementById("qr-rop-when-k").textContent = "Back at year " + tier.term;
+        document.getElementById("qr-rop-amt").textContent = fmt.currency0(ropReturn(annual));
+      }
+
+      /* ---------- rail stepper render ---------- */
+      function renderRail() {
+        document.getElementById("rail").innerHTML = STEPS.map(function (s) {
+          // done = any step before the current one; active = the current step.
+          // visited = reachable (anything up to the furthest step seen) → navigable.
+          var visited = s.n <= maxVisited;
+          var cls = "wstep" + (s.n < draft.step ? " done" : "") + (s.n === draft.step ? " active" : "");
+          var inner = (s.n < draft.step
+            ? '<span class="wnum"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg></span>'
+            : '<span class="wnum">' + s.n + '</span>');
+          return '<div class="' + cls + '" data-go="' + s.n + '" role="button" tabindex="0" aria-disabled="' + (!visited) + '">' +
+            inner +
+            '<span class="wstep-meta"><span>' + s.title + '</span><span class="wstep-sub">' + s.sub + '</span></span></div>';
+        }).join("");
+        document.querySelectorAll("#rail .wstep").forEach(function (el) {
+          var go = +el.getAttribute("data-go");
+          function nav() { if (go <= maxVisited) { draft.step = go; saveDraft(); render(); } }
+          el.addEventListener("click", nav);
+          el.addEventListener("keydown", function (e) { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); nav(); } });
+        });
+      }
+
+      /* ---------- step header helper ---------- */
+      function stepHead(s) {
+        return '<div class="panel-head">' +
+          '<div class="step-eyebrow"><span class="se-count">Step ' + s.n + ' of 5</span></div>' +
+          '<h3 class="step-h">' + s.title + '</h3>' +
+          '<p class="step-sub">' + STEP_SUB[s.n] + '</p></div>';
+      }
+      var STEP_SUB = {
+        1: "Tell us who you are. We'll use this to prepare your policy documents.",
+        2: "A few facts about the property you're insuring. We pre-fill what we can.",
+        3: "Set your dwelling coverage — everything else scales with it.",
+        4: "Stay claims-free and a share of your premium comes back to you.",
+        5: "Here's everything. Confirm and get your instant AI decision."
+      };
+
+      /* ===================== STEP RENDERERS ===================== */
+      function esc(v) { return (v == null ? "" : String(v)).replace(/"/g, "&quot;"); }
+
+      function renderStep1() {
+        var a = draft.applicant;
+        return stepHead(STEPS[0]) +
+          '<div class="panel-body" style="margin-top:18px;">' +
+            '<div style="display:flex;justify-content:flex-end;margin-bottom:6px;">' +
+              '<button class="demo-fill" id="demo-fill">Use demo applicant</button>' +
+            '</div>' +
+            '<div class="grid-2col">' +
+              field("firstName", "First name", "text", a.firstName, "Jordan") +
+              field("lastName", "Last name", "text", a.lastName, "Hayes") +
+            '</div>' +
+            '<div class="field compact span-2"><label for="f-email">Email</label>' +
+              '<input class="input" id="f-email" data-k="email" type="email" value="' + esc(a.email) + '" placeholder="jordan@example.com" autocomplete="email" />' +
+              '<span class="err-msg">Enter a valid email address.</span></div>' +
+            '<div class="field compact"><label for="f-phone">Phone</label>' +
+              '<input class="input" id="f-phone" data-k="phone" type="tel" value="' + esc(a.phone) + '" placeholder="(614) 555-0142" autocomplete="tel" />' +
+              '<span class="err-msg">Enter your phone number.</span></div>' +
+          '</div>';
+      }
+      function field(key, label, type, val, placeholder) {
+        return '<div class="field compact"><label for="f-' + key + '">' + label + '</label>' +
+          '<input class="input" id="f-' + key + '" data-k="' + key + '" type="' + type + '" value="' + esc(val) + '" placeholder="' + esc(placeholder) + '" />' +
+          '<span class="err-msg">This field is required.</span></div>';
+      }
+
+      function renderStep2() {
+        var p = draft.property;
+        return stepHead(STEPS[1]) +
+          '<div class="panel-body" style="margin-top:18px;">' +
+            '<button class="btn btn-ai-ghost btn-sm auto-fill-btn" id="autofill"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg> Auto-fill from address</button>' +
+            '<div id="prop-fields">' +
+              '<div class="field compact"><label for="p-line1">Street address</label>' +
+                '<input class="input" id="p-line1" data-p="line1" type="text" value="' + esc(p.line1) + '" placeholder="742 Evergreen Terrace" autocomplete="address-line1" />' +
+                '<span class="err-msg">Enter the property address.</span></div>' +
+              '<div class="grid-3col">' +
+                '<div class="field compact span-2" style="grid-column:span 1;"><label for="p-city">City</label>' +
+                  '<input class="input" id="p-city" data-p="city" type="text" value="' + esc(p.city) + '" /></div>' +
+                '<div class="field compact"><label for="p-state">State</label>' +
+                  '<select class="select" id="p-state" data-p="state">' +
+                    '<option value="OH"' + (p.state === "OH" ? " selected" : "") + '>Ohio</option>' +
+                    '<option value="WI"' + (p.state === "WI" ? " selected" : "") + '>Wisconsin</option>' +
+                  '</select></div>' +
+                '<div class="field compact"><label for="p-zip">ZIP</label>' +
+                  '<input class="input" id="p-zip" data-p="zip" type="text" inputmode="numeric" maxlength="5" value="' + esc(p.zip) + '" /></div>' +
+              '</div>' +
+              '<p class="tiny" style="color:var(--text-3);margin:-4px 0 14px;display:flex;align-items:center;gap:6px;"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="var(--ai)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16v-4M12 8h.01"/><circle cx="12" cy="12" r="10"/></svg> Self-Insure is live in Ohio &amp; Wisconsin.</p>' +
+              '<div class="grid-2col">' +
+                '<div class="field compact"><label for="p-yearBuilt">Year built</label>' +
+                  '<input class="input" id="p-yearBuilt" data-p="yearBuilt" type="number" min="1850" max="2026" value="' + esc(p.yearBuilt) + '" /></div>' +
+                '<div class="field compact"><label for="p-squareFeet">Square feet</label>' +
+                  '<input class="input" id="p-squareFeet" data-p="squareFeet" type="number" min="400" max="12000" value="' + esc(p.squareFeet) + '" /></div>' +
+                '<div class="field compact"><label for="p-constructionType">Construction</label>' +
+                  '<select class="select" id="p-constructionType" data-p="constructionType">' +
+                    ['Frame', 'Masonry', 'Brick'].map(function (c) { return '<option' + (p.constructionType === c ? ' selected' : '') + '>' + c + '</option>'; }).join('') +
+                  '</select></div>' +
+                '<div class="field compact"><label for="p-roofYear">Roof installed</label>' +
+                  '<input class="input" id="p-roofYear" data-p="roofYear" type="number" min="1950" max="2026" value="' + esc(p.roofYear) + '" /></div>' +
+                '<div class="field compact"><label for="p-stories">Stories</label>' +
+                  '<select class="select" id="p-stories" data-p="stories">' +
+                    [1, 2, 3].map(function (n) { return '<option value="' + n + '"' + (+p.stories === n ? ' selected' : '') + '>' + n + '</option>'; }).join('') +
+                  '</select></div>' +
+                '<div class="field compact"><label for="p-occupancy">Occupancy</label>' +
+                  '<select class="select" id="p-occupancy" data-p="occupancy">' +
+                    ['Primary residence', 'Secondary home', 'Rental'].map(function (o) { return '<option' + (p.occupancy === o ? ' selected' : '') + '>' + o + '</option>'; }).join('') +
+                  '</select></div>' +
+              '</div>' +
+            '</div>' +
+          '</div>';
+      }
+
+      function renderStep3() {
+        var sel = draft.coverageSelections;
+        var covs = derivedCoverages(sel.dwelling);
+        return stepHead(STEPS[2]) +
+          '<div class="panel-body" style="margin-top:18px;">' +
+            '<div class="field" style="margin-bottom:6px;">' +
+              '<div class="slider-readout"><span class="label">Dwelling coverage (A)</span><span class="sr-val" id="dw-val">' + fmt.currency0(sel.dwelling) + '</span></div>' +
+              '<input class="range" id="dw-range" type="range" min="310000" max="490000" step="10000" value="' + sel.dwelling + '" aria-label="Dwelling coverage" />' +
+              '<div class="slider-ticks"><span>$310K</span><span>$400K</span><span>$490K</span></div>' +
+            '</div>' +
+            '<p class="tiny muted" style="margin:2px 0 18px;">This is what it costs to rebuild your home. Your other coverages scale from it automatically.</p>' +
+
+            '<div class="field" style="margin-bottom:18px;">' +
+              '<label style="margin-bottom:8px;">All-perils deductible</label>' +
+              '<div class="segmented seg-full" id="ded-seg" role="group" aria-label="Deductible">' +
+                [1000, 1500, 2500].map(function (d) {
+                  return '<button type="button" data-ded="' + d + '"' + (sel.deductible === d ? ' class="active"' : '') + '>' + fmt.currency0(d) + '</button>';
+                }).join('') +
+              '</div>' +
+              '<p class="tiny muted-3" style="margin-top:7px;">A lower deductible means a higher premium. Wind/hail is a separate 1% of dwelling.</p>' +
+            '</div>' +
+
+            '<div class="card pad-sm" style="background:var(--surface-2);box-shadow:none;">' +
+              '<div class="eyebrow" style="margin-bottom:4px;">Your coverages</div>' +
+              '<div class="cov-derived" id="cov-list"></div>' +
+            '</div>' +
+
+            '<details class="explain">' +
+              '<summary><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16v-4M12 8h.01"/><circle cx="12" cy="12" r="10"/></svg> What does each coverage mean?<svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg></summary>' +
+              '<div class="explain-body" id="explain-body"></div>' +
+            '</details>' +
+          '</div>';
+      }
+
+      function renderStep4() {
+        var annual = recalcPremium();
+        var sel = draft.coverageSelections;
+        var cards = Object.keys(TIERS).map(function (key) {
+          var t = TIERS[key];
+          var back = Math.round(annual * t.term * (t.pct / 100));
+          var seld = sel.ropTier === key;
+          return '<button type="button" class="tier-card' + (seld ? ' sel' : '') + '" data-tier="' + key + '" aria-pressed="' + seld + '">' +
+            '<span class="tier-radio"></span>' +
+            '<div class="tier-name">' + t.name + (key === "bronze" ? ' <span class="pill pill-ai" style="height:18px;padding:0 7px;font-size:10px;">Popular</span>' : '') + '</div>' +
+            '<div class="tier-pct">' + t.pct + '%</div>' +
+            '<div class="tier-term">back over ' + t.term + ' claims-free years</div>' +
+            '<div class="tier-back">You\'d get <b>' + fmt.currency0(back) + '</b> back</div>' +
+          '</button>';
+        }).join('');
+        return stepHead(STEPS[3]) +
+          '<div class="panel-body" style="margin-top:18px;">' +
+            '<div class="ribbon" style="margin-bottom:18px;">' +
+              '<span class="r-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 9-9"/><path d="M3 4v5h5"/></svg></span>' +
+              '<div class="r-body"><div class="r-title">The insurance that gives it back.</div>' +
+              '<div class="r-sub">If you stay claims-free, a share of every premium you pay comes back to you.</div></div>' +
+            '</div>' +
+            '<div class="tier-grid" id="tier-grid">' + cards + '</div>' +
+            '<p class="tiny muted" style="margin-top:14px;line-height:1.5;">Start on <b style="color:var(--text);">Bronze</b> and step up to Silver or Gold at any renewal. One paid claim doesn\'t erase your return — your tier and timeline simply adjust.</p>' +
+          '</div>';
+      }
+
+      function renderStep5() {
+        var a = draft.applicant, p = draft.property, sel = draft.coverageSelections;
+        var annual = recalcPremium(), monthly = Math.round(annual / 12);
+        var tier = TIERS[sel.ropTier];
+        var name = (a.firstName || a.lastName) ? (a.firstName + " " + a.lastName).trim() : "—";
+        function kv(k, v) { return '<div class="qr-line"><span class="qr-k">' + k + '</span><span class="qr-v">' + v + '</span></div>'; }
+        return stepHead(STEPS[4]) +
+          '<div class="panel-body" style="margin-top:18px;">' +
+            '<div class="card pad-lg card-ai-tint" style="text-align:center;margin-bottom:18px;">' +
+              '<div class="eyebrow" style="color:var(--ai);">Estimated premium</div>' +
+              '<div class="figure-xl" style="margin:6px 0 2px;">' + fmt.currency0(annual) + ' <span style="font-family:var(--font-ui);font-size:15px;color:var(--text-2);font-weight:500;">/ year</span></div>' +
+              '<div class="muted">or <b style="color:var(--text);" class="num">' + fmt.currency0(monthly) + '</b> / month · finalized when you get your decision</div>' +
+            '</div>' +
+            '<div class="review-grid">' +
+              '<div class="review-block">' +
+                '<div class="rb-head"><span class="rb-title">Applicant</span><button class="rb-edit" data-edit="1">Edit</button></div>' +
+                kv("Name", name) + kv("Email", a.email || "—") + kv("Phone", a.phone || "—") +
+              '</div>' +
+              '<div class="review-block">' +
+                '<div class="rb-head"><span class="rb-title">Property</span><button class="rb-edit" data-edit="2">Edit</button></div>' +
+                kv("Address", (p.line1 || "—")) + kv("City", p.city + ", " + p.state + " " + p.zip) +
+                kv("Built / roof", p.yearBuilt + " · roof " + p.roofYear) + kv("Size", fmt.currency0(p.squareFeet).replace("$", "") + " sq ft · " + p.constructionType) +
+              '</div>' +
+              '<div class="review-block">' +
+                '<div class="rb-head"><span class="rb-title">Coverage</span><button class="rb-edit" data-edit="3">Edit</button></div>' +
+                kv("Dwelling (A)", fmt.currency0(sel.dwelling)) +
+                kv("All-perils deductible", fmt.currency0(sel.deductible)) +
+                kv("Wind/hail", "1% of dwelling (" + fmt.currency0(Math.round(sel.dwelling * 0.01)) + ")") +
+              '</div>' +
+              '<div class="review-block">' +
+                '<div class="rb-head"><span class="rb-title">Return of Premium</span><button class="rb-edit" data-edit="4">Edit</button></div>' +
+                kv("Tier", tier.name + " · " + tier.pct + "%") +
+                kv("Term", tier.term + " years claims-free") +
+                '<div class="qr-line"><span class="qr-k">You\'d get back</span><span class="qr-v ai-text">' + fmt.currency0(ropReturn(annual)) + '</span></div>' +
+              '</div>' +
+            '</div>' +
+            '<p class="tiny muted-3" style="margin-top:16px;display:flex;gap:8px;align-items:flex-start;"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" style="flex:0 0 15px;margin-top:1px;"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg> Most applicants are approved instantly. A small share are referred to a human underwriter — we\'ll tell you in seconds.</p>' +
+          '</div>';
+      }
+
+      var RENDERERS = { 1: renderStep1, 2: renderStep2, 3: renderStep3, 4: renderStep4, 5: renderStep5 };
+
+      /* ===================== WIRE EACH STEP ===================== */
+      function wireStep() {
+        if (draft.step === 1) wireStep1();
+        else if (draft.step === 2) wireStep2();
+        else if (draft.step === 3) wireStep3();
+        else if (draft.step === 4) wireStep4();
+        else if (draft.step === 5) wireStep5();
+      }
+
+      function wireStep1() {
+        ["firstName", "lastName"].forEach(function (k) {
+          var el = document.getElementById("f-" + k);
+          el.addEventListener("input", function () { draft.applicant[k] = el.value; saveDraft(); clearErr(el); });
+        });
+        document.getElementById("f-email").addEventListener("input", function (e) { draft.applicant.email = e.target.value; saveDraft(); clearErr(e.target); });
+        document.getElementById("f-phone").addEventListener("input", function (e) { draft.applicant.phone = e.target.value; saveDraft(); clearErr(e.target); });
+        document.getElementById("demo-fill").addEventListener("click", function () {
+          draft.applicant = { firstName: "Jordan", lastName: "Hayes", email: "jordan.hayes@example.com", phone: "(614) 555-0188" };
+          if (!draft.property.line1) draft.property.line1 = "742 Evergreen Terrace";
+          saveDraft(); render();
+          SI.ui.toast("Demo applicant loaded.", "ai");
+        });
+      }
+
+      function wireStep2() {
+        document.querySelectorAll("[data-p]").forEach(function (el) {
+          var k = el.getAttribute("data-p");
+          el.addEventListener(el.tagName === "SELECT" ? "change" : "input", function () {
+            var v = el.value;
+            if (k === "yearBuilt" || k === "squareFeet" || k === "roofYear" || k === "stories") v = +v || draft.property[k];
+            draft.property[k] = v; saveDraft(); clearErr(el);
+            if (k === "roofYear" || k === "constructionType") updateRail();
+          });
+        });
+        document.getElementById("autofill").addEventListener("click", function () {
+          var btn = this;
+          btn.disabled = true;
+          btn.innerHTML = '<span class="spinner"></span> Pulling property data…';
+          var wrap = document.getElementById("prop-fields");
+          wrap.querySelectorAll(".input, .select").forEach(function (i) { i.classList.add("shimmering"); });
+          setTimeout(function () {
+            var p = draft.property;
+            // PRESERVE anything the applicant already typed (same as line1). If they've
+            // chosen Wisconsin or entered a city/zip, don't yank them back to Ohio — that
+            // would contradict the on-page "live in Ohio & Wisconsin" messaging. Pick the
+            // sample address to match the state they actually selected.
+            var sampleByState = {
+              OH: { line1: "1247 Hamlet Street", city: "Columbus", zip: "43201" },
+              WI: { line1: "318 N Few Street",   city: "Madison",  zip: "53703" }
+            };
+            var sample = sampleByState[p.state] || sampleByState.OH;
+            Object.assign(draft.property, {
+              line1: p.line1 || sample.line1,
+              city:  p.city  || sample.city,
+              state: p.state || "OH",
+              zip:   p.zip   || sample.zip,
+              // non-location facts are what the "data pull" actually fills in
+              yearBuilt: 1994, squareFeet: 2240, constructionType: "Frame",
+              roofYear: 2019, stories: 2, occupancy: "Primary residence"
+            });
+            saveDraft();
+            SI.ui.toast("Pulled 140 property data points.", "ai", { title: "Auto-filled" });
+            render();
+            updateRail();
+          }, 1300);
+        });
+      }
+
+      function wireStep3() {
+        var sel = draft.coverageSelections;
+        var range = document.getElementById("dw-range");
+        function paintCov() {
+          var covs = derivedCoverages(sel.dwelling);
+          document.getElementById("cov-list").innerHTML = covs.map(function (c) {
+            return '<div class="cov-row' + (c.auto ? ' is-auto' : '') + '">' +
+              '<span class="code-chip">' + c.code + '</span>' +
+              '<span class="cov-name"><span class="cov-t">' + c.name + '</span><span class="cov-b">' + c.blurb + '</span></span>' +
+              '<span class="cov-amt">' + fmt.currency0(c.amount) + '</span></div>';
+          }).join("");
+          document.getElementById("explain-body").innerHTML = covs.map(function (c) {
+            return '<div class="eb-line"><span class="code-chip">' + c.code + '</span><span><b style="color:var(--text);">' + c.name + ' — ' + fmt.currency0(c.amount) + '</b><br>' + c.blurb + '.</span></div>';
+          }).join("");
+        }
+        paintCov();
+        range.addEventListener("input", function () {
+          sel.dwelling = +range.value;
+          document.getElementById("dw-val").textContent = fmt.currency0(sel.dwelling);
+          paintCov(); updateRail();
+        });
+        range.addEventListener("change", saveDraft);
+        document.querySelectorAll("#ded-seg button").forEach(function (b) {
+          b.addEventListener("click", function () {
+            document.querySelectorAll("#ded-seg button").forEach(function (x) { x.classList.remove("active"); });
+            b.classList.add("active");
+            sel.deductible = +b.getAttribute("data-ded");
+            saveDraft(); updateRail();
+          });
+        });
+      }
+
+      function wireStep4() {
+        document.querySelectorAll("#tier-grid .tier-card").forEach(function (card) {
+          card.addEventListener("click", function () {
+            draft.coverageSelections.ropTier = card.getAttribute("data-tier");
+            saveDraft();
+            document.querySelectorAll("#tier-grid .tier-card").forEach(function (c) { c.classList.remove("sel"); c.setAttribute("aria-pressed", "false"); });
+            card.classList.add("sel"); card.setAttribute("aria-pressed", "true");
+            updateRail();
+          });
+        });
+      }
+
+      function wireStep5() {
+        document.querySelectorAll("[data-edit]").forEach(function (b) {
+          b.addEventListener("click", function () { draft.step = +b.getAttribute("data-edit"); saveDraft(); render(); });
+        });
+      }
+
+      /* ===================== VALIDATION ===================== */
+      function clearErr(el) { var f = el.closest(".field"); if (f) f.classList.remove("field-error"); }
+      function setErr(el) { var f = el.closest(".field"); if (f) f.classList.add("field-error"); return el; }
+      function validateStep() {
+        if (draft.step === 1) {
+          var first = document.getElementById("f-firstName");
+          var last = document.getElementById("f-lastName");
+          var email = document.getElementById("f-email");
+          var bad = null;
+          if (!last.value.trim()) bad = setErr(last);
+          if (!first.value.trim()) bad = setErr(first) || bad;
+          var emailOk = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.value.trim());
+          if (!emailOk) bad = setErr(email) || bad;
+          // re-evaluate which is the FIRST invalid for focus (top-to-bottom)
+          var order = [first, last, email];
+          var firstBad = order.find(function (el) { return el.closest(".field").classList.contains("field-error"); });
+          if (firstBad) { firstBad.focus(); return false; }
+          return true;
+        }
+        if (draft.step === 2) {
+          var line1 = document.getElementById("p-line1");
+          if (!line1.value.trim()) { setErr(line1); line1.focus(); return false; }
+          return true;
+        }
+        return true; // steps 3 & 4 always valid (have defaults)
+      }
+
+      /* ===================== NAV / RENDER ===================== */
+      function render() {
+        maxVisited = Math.max(maxVisited, draft.step);
+        document.getElementById("panel").innerHTML = RENDERERS[draft.step]();
+        renderRail();
+        wireStep();
+        // footer buttons — fully remove Back on step 1 (display:none, not visibility:
+        // hidden) so it leaves no ghost gap. The foot-spacer keeps Continue right-aligned.
+        document.getElementById("btn-back").classList.toggle("hidden", draft.step === 1);
+        var next = document.getElementById("btn-next");
+        if (draft.step === 5) {
+          next.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l1.6 4.6L18 9l-4.4 1.4L12 15l-1.6-4.6L6 9l4.4-1.4z"/></svg> Get my instant decision';
+        } else {
+          next.innerHTML = 'Continue <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 5l7 7-7 7"/></svg>';
+        }
+        updateRail();
+        document.querySelector(".qz-panel").scrollIntoView({ behavior: "smooth", block: "nearest" });
+      }
+
+      document.getElementById("btn-back").addEventListener("click", function () {
+        if (draft.step > 1) { draft.step--; saveDraft(); render(); }
+      });
+      document.getElementById("btn-next").addEventListener("click", function () {
+        if (!validateStep()) return;
+        if (draft.step < 5) { draft.step++; saveDraft(); render(); return; }
+        // FINISH → persist quote inputs + route to underwriting
+        finishToUnderwriting();
+      });
+
+      function finishToUnderwriting() {
+        var annual = recalcPremium();
+        draft.quote = draft.quote || {};
+        draft.quote.premiumAnnual = annual;
+        draft.quote.premiumMonthly = Math.round(annual / 12);
+        // leave decision/confidence/dataPoints for the underwriting screen to populate.
+        // Persist on the review step (5) — that's the correct, recoverable place to
+        // land if the applicant hits the browser Back button from underwriting.
+        draft.step = 5;
+        saveDraft();
+        var btn = document.getElementById("btn-next");
+        var back = document.getElementById("btn-back");
+        var nextOriginal = btn.innerHTML;
+        btn.innerHTML = '<span class="spinner"></span> Preparing your application…';
+        btn.disabled = true;
+        back.disabled = true;
+        setTimeout(function () { SI.ui.route("underwriting.html"); }, 850);
+        // Guard: if navigation hasn't taken over (route blocked, file missing, or
+        // the user hit Back and bfcache-restored this page), don't strand the wizard
+        // in a half-disabled state — restore the buttons so the flow is never dead.
+        setTimeout(function () {
+          if (!document.getElementById("btn-next")) return; // page already navigated away
+          btn.disabled = false;
+          back.disabled = false;
+          btn.innerHTML = nextOriginal;
+        }, 4000);
+        window.addEventListener("pageshow", function (e) {
+          if (e.persisted) { btn.disabled = false; back.disabled = false; btn.innerHTML = nextOriginal; }
+        });
+      }
+
+      /* ask-about-quote button → inline pricing explainer.
+         This is the PRE-AUTH funnel: the applicant has no policy yet, so we must
+         NOT route into the member assistant (which answers as Eleanor Marsh and
+         would reference a policy, an active claim, and ROP history this prospect
+         doesn't have). Instead we explain the live draft the user is building,
+         reading numbers straight from the in-progress quote — never SI.account. */
+      document.getElementById("qr-ask").addEventListener("click", function () {
+        var annual = recalcPremium();
+        var monthly = Math.round(annual / 12);
+        var sel = draft.coverageSelections;
+        var tier = TIERS[sel.ropTier];
+        var firstName = (draft.applicant.firstName || "").trim();
+        var hi = firstName ? firstName : "there";
+        var node = document.createElement("div");
+        node.innerHTML =
+          '<div class="modal-head">' +
+            '<div class="modal-title" style="display:flex;align-items:center;gap:9px;">' +
+              '<span class="qrt-ico" style="width:30px;height:30px;border-radius:8px;">' +
+                '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l1.6 4.6L18 9l-4.4 1.4L12 15l-1.6-4.6L6 9l4.4-1.4z"/></svg>' +
+              '</span>How your quote is priced</div>' +
+            '<button class="modal-close" data-close aria-label="Close">' + SI.icon("x") + '</button>' +
+          '</div>' +
+          '<div class="modal-body">' +
+            '<p class="muted" style="margin-bottom:14px;line-height:1.6;">Hi ' + esc(hi) + ' — your estimate isn\'t a generic table rate. Our AI model aggregates <b style="color:var(--text);">~140 data points</b> about the specific home you\'re quoting — property records, roof and satellite imagery, catastrophe exposure, and replacement cost — and prices the risk in seconds.</p>' +
+            '<div class="card pad-sm" style="background:var(--surface-2);box-shadow:none;margin-bottom:14px;">' +
+              '<div class="qr-line"><span class="qr-k">Your live estimate</span><span class="qr-v ai-text">' + fmt.currency0(annual) + ' / yr · ' + fmt.currency0(monthly) + ' / mo</span></div>' +
+              '<div class="qr-line"><span class="qr-k">Dwelling coverage (A)</span><span class="qr-v">' + fmt.currency0(sel.dwelling) + '</span></div>' +
+              '<div class="qr-line"><span class="qr-k">All-perils deductible</span><span class="qr-v">' + fmt.currency0(sel.deductible) + '</span></div>' +
+              '<div class="qr-line"><span class="qr-k">Return of Premium</span><span class="qr-v">' + tier.name + ' · ' + tier.pct + '% (' + fmt.currency0(ropReturn(annual)) + ' back at year ' + tier.term + ')</span></div>' +
+            '</div>' +
+            '<p class="tiny muted-3" style="line-height:1.6;">Three things move this number as you build your quote: your <b style="color:var(--text);">dwelling amount</b> (what it costs to rebuild), your <b style="color:var(--text);">deductible</b>, and the <b style="color:var(--text);">roof and construction</b> details on the property step. A lower deductible raises the premium; a newer roof lowers it. Because our expense ratio is just <b style="color:var(--text);">8% vs. 25–30% industry</b>, more of every dollar funds your coverage — and your return of premium. Your final price is locked when you get your instant decision.</p>' +
+          '</div>' +
+          '<div class="modal-foot"><button class="btn btn-primary" data-close>Got it</button></div>';
+        SI.ui.openModal(node);
+      });
+
+      /* go */
+      render();
+    });
+  </script>
+</body>
+</html>
