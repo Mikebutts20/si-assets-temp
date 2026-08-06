@@ -1,0 +1,514 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Self-Insure — The Client Experience</title>
+<meta name="description" content="What the homeowner holds — a same-day quote, premiums tracking toward 50/75/100% returned, and claims settled the same day. The insurance that gives it back.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="styles.css">
+<style>
+/* ── page-scoped tweaks (app.html only) — composed from canonical primitives ── */
+
+/* phone shell sized up for a real in-app demo, with an internal scroll */
+.device.app-device { max-width: 392px; }
+.device.app-device .device-screen { min-height: 720px; }
+.device.app-device .device-body { padding: 0; }
+
+/* in-app top bar (brand + balance) */
+.app-topbar { padding: 1.15rem 1.25rem 0.85rem; border-bottom: 1px solid var(--border); }
+.app-topbar .ab-row { display: flex; justify-content: space-between; align-items: flex-start; }
+.app-topbar .ab-brand { font-family: var(--serif); font-size: 1.05rem; color: var(--gold); font-weight: 500; letter-spacing: 0.01em; }
+.app-topbar .ab-sub { font-size: 0.56rem; text-transform: uppercase; letter-spacing: 0.16em; color: var(--text-tertiary); margin-top: 2px; }
+.app-topbar .ab-avatar { width: 30px; height: 30px; border-radius: 50%; border: 1px solid var(--border-accent); background: var(--surface2); display: flex; align-items: center; justify-content: center; font-family: var(--serif); font-size: 0.78rem; color: var(--gold); flex-shrink: 0; }
+.app-greet { font-family: var(--serif); font-size: 1.15rem; color: var(--text); margin-top: 1rem; line-height: 1.3; }
+.app-greet small { display: block; font-family: var(--sans); font-size: 0.66rem; color: var(--text-secondary); font-weight: 400; margin-top: 0.25rem; letter-spacing: 0.01em; }
+
+/* in-app tab bar uses the canonical .tabs + .tabs--compact modifier (styles.css);
+   no page-scoped tab override here. Only the pane padding is app-specific. */
+.app-panes { padding: 1.15rem 1.25rem 1.5rem; }
+
+/* compact in-app stat tiles */
+.app-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 1px; background: var(--border); border: 1px solid var(--border); border-radius: 2px; overflow: hidden; }
+.app-stats .as { background: var(--surface); padding: 1.05rem 1rem; }
+.app-stats .as.span2 { grid-column: 1 / -1; }
+.app-stats .as-l { font-size: 0.56rem; text-transform: uppercase; letter-spacing: 0.1em; color: var(--text-tertiary); font-weight: 500; }
+.app-stats .as-v { font-family: var(--serif); font-size: 1.6rem; font-weight: 500; color: var(--gold); line-height: 1.1; margin-top: 0.3rem; }
+.app-stats .as-v.pos { color: var(--positive); }
+.app-stats .as-v.sm { font-size: 1.25rem; }
+.app-stats .as-note { font-size: 0.58rem; color: var(--text-secondary); margin-top: 0.25rem; line-height: 1.4; }
+.app-stats .as-src { font-size: 0.52rem; color: var(--text-tertiary); margin-top: 0.35rem; display: block; }
+
+/* section label inside the app */
+.app-sec { font-size: 0.58rem; text-transform: uppercase; letter-spacing: 0.14em; color: var(--text-tertiary); font-weight: 500; margin: 1.5rem 0 0.75rem; }
+.app-sec:first-child { margin-top: 0.25rem; }
+
+/* in-app chart, shorter holder */
+.app-chart { background: var(--surface); border: 1px solid var(--border); border-radius: 2px; padding: 1rem 0.85rem 0.75rem; }
+.app-chart .ac-head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 0.6rem; }
+.app-chart .ac-title { font-family: var(--serif); font-size: 0.85rem; color: var(--gold); font-weight: 500; }
+.app-chart .ac-meta { font-size: 0.54rem; color: var(--text-tertiary); }
+.app-chart .holder { position: relative; height: 168px; }
+.app-chart .ac-legend { display: flex; gap: 1rem; justify-content: center; margin-top: 0.7rem; flex-wrap: wrap; }
+.app-chart .ac-li { display: flex; align-items: center; gap: 0.35rem; font-size: 0.56rem; color: var(--text-tertiary); }
+.app-chart .ac-dot { width: 8px; height: 8px; border-radius: 2px; }
+.app-chart .ac-dot.gold { background: rgba(195,170,130,0.7); }
+.app-chart .ac-dot.neut { background: rgba(138,154,181,0.6); }
+.app-chart .ac-dot.pos { background: rgba(122,184,143,0.6); }
+
+/* loyalty milestone ladder (ROP tab) — named .rop-ladder so it does NOT collide
+   with the canonical cost-ladder (.ladder / .ladder-row in styles.css). */
+.rop-ladder { position: relative; padding-left: 1.7rem; margin: 0.5rem 0 0.5rem; }
+.rop-ladder::before { content: ''; position: absolute; left: 5px; top: 0.5rem; bottom: 0.5rem; width: 1px; background: linear-gradient(to bottom, var(--positive), var(--gold-dim) 40%, var(--border)); }
+.rop-rung { position: relative; padding: 0 0 1.4rem 0.7rem; }
+.rop-rung:last-child { padding-bottom: 0; }
+.rop-rung::before { content: ''; position: absolute; left: -1.7rem; top: 0.2rem; width: 11px; height: 11px; border-radius: 50%; background: var(--surface); border: 2px solid var(--gold-dim); box-shadow: 0 0 0 3px var(--bg); }
+.rop-rung.is-here::before { background: var(--gold); border-color: var(--gold); }
+.rop-rung.is-done::before { background: var(--positive); border-color: var(--positive); }
+.rop-rung .rg-top { display: flex; justify-content: space-between; align-items: baseline; gap: 0.5rem; }
+.rop-rung .rg-name { font-family: var(--serif); font-size: 0.95rem; color: var(--text); font-weight: 500; }
+.rop-rung.is-here .rg-name { color: var(--gold); }
+.rop-rung .rg-amt { font-family: var(--serif); font-size: 0.95rem; color: var(--gold); font-weight: 500; white-space: nowrap; }
+.rop-rung.is-gold .rg-amt { color: var(--positive); }
+.rop-rung .rg-meta { font-size: 0.62rem; color: var(--text-secondary); margin-top: 0.15rem; }
+.rop-rung .rg-here { display: inline-block; margin-top: 0.45rem; font-size: 0.55rem; text-transform: uppercase; letter-spacing: 0.1em; color: var(--gold); border: 1px solid var(--border-accent); background: var(--gold-subtle); border-radius: 999px; padding: 0.12rem 0.5rem; }
+
+/* big "back at year 10" hero figure inside ROP tab */
+.rop-hero { border: 1px solid var(--border-accent); background: var(--gold-subtle); border-radius: 2px; padding: 1.25rem 1.1rem; text-align: center; }
+.rop-hero .rh-l { font-size: 0.56rem; text-transform: uppercase; letter-spacing: 0.12em; color: var(--gold); font-weight: 500; }
+.rop-hero .rh-v { font-family: var(--serif); font-size: 2.7rem; color: var(--gold); font-weight: 600; line-height: 1; margin: 0.35rem 0; }
+.rop-hero .rh-sub { font-size: 0.62rem; color: var(--text-secondary); }
+.rop-hero .rh-prog { margin-top: 0.9rem; }
+.rop-hero .rh-prog .rp-track { height: 7px; background: var(--surface2); border-radius: 1px; overflow: hidden; }
+.rop-hero .rh-prog .rp-fill { height: 100%; width: 0; background: rgba(195,170,130,0.65); border-radius: 1px; transition: width 1.4s cubic-bezier(0.16,1,0.3,1); }
+.rop-hero .rh-prog .rp-cap { display: flex; justify-content: space-between; font-size: 0.55rem; color: var(--text-tertiary); margin-top: 0.35rem; }
+
+/* claims status timeline (compact, app-scaled) */
+.claim-flow { position: relative; padding-left: 1.7rem; margin-top: 0.5rem; }
+.claim-flow::before { content: ''; position: absolute; left: 5px; top: 0.5rem; bottom: 0.5rem; width: 1px; background: linear-gradient(to bottom, var(--positive) 70%, var(--border)); }
+.cstep { position: relative; padding: 0 0 1.25rem 0.7rem; }
+.cstep:last-child { padding-bottom: 0; }
+.cstep::before { content: ''; position: absolute; left: -1.7rem; top: 0.2rem; width: 11px; height: 11px; border-radius: 50%; background: var(--positive); border: 2px solid var(--positive); box-shadow: 0 0 0 3px var(--bg); }
+.cstep.is-active::before { background: var(--gold); border-color: var(--gold); animation: pulse 2s infinite; }
+.cstep.is-pending::before { background: var(--surface); border-color: var(--border-accent); }
+.cstep .cs-top { display: flex; justify-content: space-between; align-items: baseline; gap: 0.5rem; }
+.cstep .cs-when { font-size: 0.56rem; text-transform: uppercase; letter-spacing: 0.1em; color: var(--positive); font-weight: 600; }
+.cstep.is-active .cs-when { color: var(--gold); }
+.cstep.is-pending .cs-when { color: var(--text-tertiary); }
+.cstep .cs-time { font-size: 0.54rem; color: var(--text-tertiary); }
+.cstep .cs-h { font-family: var(--serif); font-size: 0.9rem; color: var(--text); font-weight: 500; margin-top: 0.1rem; }
+.cstep .cs-p { font-size: 0.62rem; color: var(--text-secondary); margin-top: 0.15rem; line-height: 1.5; }
+
+/* in-app key/value rows, tighter */
+.app-kv { display: flex; justify-content: space-between; align-items: baseline; padding: 0.6rem 0; border-bottom: 1px solid var(--border); gap: 0.75rem; }
+.app-kv:last-child { border-bottom: none; }
+.app-kv .k { font-size: 0.68rem; color: var(--text-secondary); }
+.app-kv .v { font-family: var(--serif); font-size: 0.85rem; color: var(--text); font-weight: 500; text-align: right; }
+.app-kv .v.gold { color: var(--gold); }
+.app-kv .v.pos { color: var(--positive); }
+
+/* claim history rows */
+.claim-row { display: flex; justify-content: space-between; align-items: center; padding: 0.7rem 0; border-bottom: 1px solid var(--border); gap: 0.75rem; }
+.claim-row:last-child { border-bottom: none; }
+.claim-row .cr-l .cr-t { font-size: 0.72rem; color: var(--text); }
+.claim-row .cr-l .cr-d { font-size: 0.56rem; color: var(--text-tertiary); margin-top: 2px; }
+.claim-row .cr-r { text-align: right; }
+.claim-row .cr-r .cr-a { font-family: var(--serif); font-size: 0.82rem; color: var(--text); }
+
+/* the live "submit a claim" CTA card */
+.app-cta { border: 1px solid var(--border-accent); background: var(--surface2); border-radius: 2px; padding: 0.95rem 1rem; display: flex; justify-content: space-between; align-items: center; gap: 0.75rem; }
+.app-cta .cta-l .cta-t { font-family: var(--serif); font-size: 0.9rem; color: var(--text); }
+.app-cta .cta-l .cta-s { font-size: 0.58rem; color: var(--text-secondary); margin-top: 2px; }
+.app-cta .cta-go { font-size: 0.6rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--gold); font-weight: 600; white-space: nowrap; border: 1px solid var(--gold-dim); border-radius: 2px; padding: 0.45rem 0.7rem; }
+
+/* explanatory side rail (desktop two-column layout) */
+.app-stage { display: grid; grid-template-columns: 392px 1fr; gap: 3.5rem; align-items: start; }
+.app-stage .rail { padding-top: 1rem; }
+.app-stage .rail .badge--live { margin-bottom: 1.25rem; }
+@media (max-width: 900px) { .app-stage { grid-template-columns: 1fr; gap: 2.5rem; justify-items: center; } .app-stage .rail { max-width: 480px; } }
+
+/* tiny inline policy chip line under greeting */
+.policy-chips { display: flex; gap: 0.4rem; flex-wrap: wrap; margin-top: 0.85rem; }
+.policy-chips .pchip { font-size: 0.55rem; letter-spacing: 0.04em; color: var(--text-secondary); border: 1px solid var(--border); border-radius: 999px; padding: 0.18rem 0.55rem; background: var(--surface); }
+.policy-chips .pchip strong { color: var(--gold); font-weight: 600; }
+</style>
+</head>
+<body>
+
+<!-- ═══════════════════════ PERSISTENT TOP NAV ═══════════════════════ -->
+<nav class="nav">
+  <a class="wm" href="index.html">Self-Insure<span class="tag">The Insurance That Gives It Back</span></a>
+  <div class="nav-links">
+    <a href="index.html">Overview</a>
+    <a href="investor.html">Investor</a>
+    <a href="app.html">Client App</a>
+    <a href="team.html">Team</a>
+    <a href="https://self-insure-portal.vercel.app" target="_blank" rel="noopener" style="color:var(--gold);">Live app ↗</a>
+  </div>
+</nav>
+<div class="nav-offset"></div>
+
+<!-- ═══════════════════════ SECTION HEADER ═══════════════════════ -->
+<section class="section" style="padding-bottom:2.5rem;">
+  <div class="sn">I</div>
+  <h2 class="st">What the homeowner actually holds.</h2>
+  <!-- per-page roman numerals: this is the only content section, so it starts at I -->
+  <p class="sd sd--wide">The product is the proof. A single Self-Insure policyholder — $1,500 annual premium on $420,000 of dwelling coverage, now in policy year 6 of an active, claims-free return-of-premium policy — sees three things no incumbent app can show: a premium balance that is <em style="font-style:italic;color:var(--text);">coming back</em>, a loyalty path to 50/75/100% returned, and claims settled the same day. The figures below are this homeowner's, computed from the canonical ROP schedule (Self-Insure proforma v03, May 2026) and the same-day operating model.</p>
+  <div class="rule"></div>
+
+  <a href="https://self-insure-portal.vercel.app" target="_blank" rel="noopener" style="display:flex;align-items:center;justify-content:space-between;gap:1.5rem;flex-wrap:wrap;border:1px solid var(--border-accent);background:var(--gold-subtle);border-radius:4px;padding:1.25rem 1.5rem;margin:0 0 2.75rem;text-decoration:none;">
+    <div>
+      <div style="font-family:var(--serif);font-size:1.15rem;color:var(--text);margin-bottom:0.3rem;">The phone below is a preview. The real product is live.</div>
+      <div style="font-size:0.85rem;color:var(--text-secondary);line-height:1.6;">Open the full working client portal — login, instant AI underwriting, billing &amp; payments, claims, and a built-in AI assistant that knows the account. Light &amp; dark mode.</div>
+    </div>
+    <span style="white-space:nowrap;font-size:0.78rem;font-weight:600;letter-spacing:0.04em;color:var(--bg);background:var(--gold);border-radius:3px;padding:0.7rem 1.2rem;">Open the live client portal →</span>
+  </a>
+
+  <div class="app-stage">
+
+    <!-- ═══════ THE DEVICE ═══════ -->
+    <div class="device app-device">
+      <div class="device-notch"></div>
+      <div class="device-screen">
+        <div class="device-statusbar"><span class="time">9:41</span><span>Self-Insure</span></div>
+        <div class="device-body" data-tab-group>
+
+          <!-- app top bar -->
+          <div class="app-topbar">
+            <div class="ab-row">
+              <div>
+                <div class="ab-brand">Self-Insure</div>
+                <div class="ab-sub">Homeowners · Policy SI-OH-204871</div>
+              </div>
+              <div class="ab-avatar">EM</div>
+            </div>
+            <div class="app-greet">Good morning, Eleanor.
+              <small>$420,000 dwelling coverage · Columbus, OH · in force since 2020</small>
+            </div>
+            <div class="policy-chips">
+              <span class="pchip">Premium <strong>$1,500/yr</strong></span>
+              <span class="pchip">Year <strong>6 of 10</strong></span>
+              <span class="pchip">Status <strong>Claims-free</strong></span>
+            </div>
+          </div>
+
+          <!-- in-app tab bar — canonical .tabs with the .tabs--compact size modifier -->
+          <div class="tabs tabs--compact">
+            <button class="tab active" data-tab="savings">Savings</button>
+            <button class="tab" data-tab="rop">Return of Premium</button>
+            <button class="tab" data-tab="claims">Claims</button>
+          </div>
+
+          <!-- ───────── PANE 1 · SAVINGS ───────── -->
+          <div class="tab-panel active" data-panel="savings">
+            <div class="app-panes">
+
+              <div class="app-sec">Your recoverable premium</div>
+              <div class="app-stats">
+                <div class="as">
+                  <div class="as-l">Paid to date</div>
+                  <div class="as-v">$9,000</div>
+                  <div class="as-note">6 years × $1,500</div>
+                </div>
+                <div class="as">
+                  <div class="as-l">Coming back at Yr 10</div>
+                  <div class="as-v pos">$7,500</div>
+                  <div class="as-note">50% of 10-yr premiums</div>
+                </div>
+                <div class="as span2">
+                  <div class="as-l">Recoverable today, if you reach Bronze</div>
+                  <div class="as-v sm">83% of premiums paid sit inside the Bronze return</div>
+                  <div class="as-note">$7,500 of the $9,000 paid so far is already inside the Bronze milestone — the rest compounds toward Silver and Gold.</div>
+                  <span class="as-src">ROP schedule, Self-Insure proforma v03 (May 2026)</span>
+                </div>
+              </div>
+
+              <div class="app-sec">Premium paid vs. premium returned</div>
+              <div class="app-chart">
+                <div class="ac-head">
+                  <span class="ac-title">Your 30-year picture</span>
+                  <span class="ac-meta">v03 · May 2026</span>
+                </div>
+                <div class="holder"><canvas id="savingsChart" data-chart-rerender></canvas></div>
+                <div class="ac-legend">
+                  <span class="ac-li"><span class="ac-dot neut"></span>Cumulative paid</span>
+                  <span class="ac-li"><span class="ac-dot gold"></span>Returned at milestone</span>
+                </div>
+              </div>
+
+              <div class="app-sec">The reframe</div>
+              <div class="callout" style="margin:0;padding:1.1rem 1.2rem;">
+                <p style="font-size:0.74rem;">Every premium you pay is no longer a sunk cost. Stay claims-free and a defined share comes back — <strong>turning your largest recurring expense into a recoverable investment.</strong> The float on your premiums, invested at ~4% duration-matched to the 30-year obligation, is what funds the return (proforma v03).</p>
+              </div>
+
+            </div>
+          </div>
+
+          <!-- ───────── PANE 2 · RETURN OF PREMIUM ───────── -->
+          <div class="tab-panel" data-panel="rop">
+            <div class="app-panes">
+
+              <div class="rop-hero">
+                <div class="rh-l">Your next milestone · Bronze · Year 10</div>
+                <div class="rh-v">$7,500</div>
+                <div class="rh-sub">returns to you — 50% of premiums paid — if you stay claims-free</div>
+                <div class="rh-prog">
+                  <div class="rp-track"><div class="rp-fill" data-fill="60"></div></div>
+                  <div class="rp-cap"><span>Year 6 of 10</span><span>60% of the term elapsed</span></div>
+                </div>
+              </div>
+
+              <div class="app-sec">Your loyalty ladder</div>
+              <div class="rop-ladder">
+                <div class="rop-rung is-here">
+                  <div class="rg-top"><span class="rg-name">Bronze · 10 years</span><span class="rg-amt">$7,500 back</span></div>
+                  <div class="rg-meta">50% of premiums returned · 4 years away</div>
+                  <span class="rg-here">You are here — year 6</span>
+                </div>
+                <div class="rop-rung">
+                  <div class="rg-top"><span class="rg-name">Silver · 20 years</span><span class="rg-amt">$22,500 back</span></div>
+                  <div class="rg-meta">75% of premiums returned · 14 years away</div>
+                </div>
+                <div class="rop-rung is-gold">
+                  <div class="rg-top"><span class="rg-name">Gold · 30 years</span><span class="rg-amt">$45,000 back</span></div>
+                  <div class="rg-meta">100% of premiums returned — every dollar, fully recovered</div>
+                </div>
+              </div>
+
+              <div class="app-sec">How your milestones compare</div>
+              <div class="app-chart">
+                <div class="ac-head">
+                  <span class="ac-title">Returned at each tier</span>
+                  <span class="ac-meta">$1,500/yr · v03</span>
+                </div>
+                <div class="holder"><canvas id="ropChart" data-chart-rerender></canvas></div>
+                <div class="ac-legend">
+                  <span class="ac-li"><span class="ac-dot gold"></span>Bronze / Silver</span>
+                  <span class="ac-li"><span class="ac-dot pos"></span>Gold · 100%</span>
+                </div>
+              </div>
+
+              <div class="app-sec">The fine print, plainly</div>
+              <div style="border:1px solid var(--border);border-radius:2px;padding:0.3rem 1rem;">
+                <div class="app-kv"><span class="k">Tier basis</span><span class="v gold">Claims-free, in force</span></div>
+                <div class="app-kv"><span class="k">Bronze return %</span><span class="v">50% at Yr 10</span></div>
+                <div class="app-kv"><span class="k">Silver return %</span><span class="v">75% at Yr 20</span></div>
+                <div class="app-kv"><span class="k">Gold return %</span><span class="v pos">100% at Yr 30</span></div>
+                <div class="app-kv"><span class="k">Funded by</span><span class="v">Premium float @ ~4%</span></div>
+              </div>
+              <p style="font-size:0.56rem;color:var(--text-tertiary);margin-top:0.6rem;line-height:1.5;">Tier percentages and dollar figures from the ROP schedule, Self-Insure proforma v03 (May 2026), scaled to a $1,500 annual premium. Returns require continuous, claims-free coverage; a paid claim resets progress to the tier rules. Illustrative — not a guarantee.</p>
+
+            </div>
+          </div>
+
+          <!-- ───────── PANE 3 · CLAIMS ───────── -->
+          <div class="tab-panel" data-panel="claims">
+            <div class="app-panes">
+
+              <div class="app-cta">
+                <div class="cta-l">
+                  <div class="cta-t">File a claim</div>
+                  <div class="cta-s">AI-handled, same day — bound by lunch</div>
+                </div>
+                <span class="cta-go">Start →</span>
+              </div>
+
+              <div class="app-sec" style="margin-top:1.4rem;">Live · Claim CLM-31182 · roof, hail</div>
+              <div class="app-stats" style="margin-bottom:0.25rem;">
+                <div class="as">
+                  <div class="as-l">Filed</div>
+                  <div class="as-v sm">Today, 9:06 AM</div>
+                  <div class="as-note">Photo + address only</div>
+                </div>
+                <div class="as">
+                  <div class="as-l">Status</div>
+                  <div class="as-v sm pos">Approved</div>
+                  <div class="as-note">Funds same day</div>
+                </div>
+              </div>
+
+              <div class="app-sec">Same-day claims flow</div>
+              <div class="claim-flow">
+                <div class="cstep">
+                  <div class="cs-top"><span class="cs-when">Data aggregated</span><span class="cs-time">&lt; 3 sec</span></div>
+                  <div class="cs-h">Vendors queried in parallel</div>
+                  <div class="cs-p">Weather, property, and prior-claim records pulled the instant you submit — no forms.</div>
+                </div>
+                <div class="cstep">
+                  <div class="cs-top"><span class="cs-when">AI underwriting</span><span class="cs-time">&lt; 30 sec</span></div>
+                  <div class="cs-h">Coverage &amp; damage assessed</div>
+                  <div class="cs-p">The model confirms peril, coverage, and deductible against your policy automatically.</div>
+                </div>
+                <div class="cstep is-active">
+                  <div class="cs-top"><span class="cs-when">Settlement quoted</span><span class="cs-time">&lt; 2 min</span></div>
+                  <div class="cs-h">$11,400 approved, net of deductible</div>
+                  <div class="cs-p">A figure on screen in under two minutes — versus the 3–5 day industry wait.</div>
+                </div>
+                <div class="cstep is-pending">
+                  <div class="cs-top"><span class="cs-when">Funds released</span><span class="cs-time">Same day</span></div>
+                  <div class="cs-h">Paid to your account</div>
+                  <div class="cs-p">Accept the settlement and payment is initiated the same business day.</div>
+                </div>
+              </div>
+              <p style="font-size:0.56rem;color:var(--text-tertiary);margin-top:0.65rem;line-height:1.5;">Flow targets from the Self-Insure same-day operating model (May 2026): &lt;3s aggregation, &lt;30s AI underwriting, &lt;2min quote, same-day settlement — against a 3–5 day industry standard. Illustrative claim.</p>
+
+              <div class="app-sec">Your coverage</div>
+              <div style="border:1px solid var(--border);border-radius:2px;padding:0.3rem 1rem;">
+                <div class="app-kv"><span class="k">Dwelling (Cov. A)</span><span class="v gold">$420,000</span></div>
+                <div class="app-kv"><span class="k">Other structures (B)</span><span class="v">$42,000</span></div>
+                <div class="app-kv"><span class="k">Personal property (C)</span><span class="v">$210,000</span></div>
+                <div class="app-kv"><span class="k">Liability (E)</span><span class="v">$300,000</span></div>
+                <div class="app-kv"><span class="k">All-perils deductible</span><span class="v">$1,500</span></div>
+              </div>
+
+              <div class="app-sec">Claim history</div>
+              <div style="border:1px solid var(--border);border-radius:2px;padding:0.3rem 1rem;">
+                <div class="claim-row">
+                  <div class="cr-l">
+                    <div class="cr-t">Roof — hail <span class="badge badge--live" style="margin-left:4px;"><span class="dot"></span>Live</span></div>
+                    <div class="cr-d">Today · CLM-31182</div>
+                  </div>
+                  <div class="cr-r"><div class="cr-a color-gold">In progress</div></div>
+                </div>
+                <div class="claim-row">
+                  <div class="cr-l">
+                    <div class="cr-t">No prior claims</div>
+                    <div class="cr-d">2020–2026 · 6 years clean</div>
+                  </div>
+                  <div class="cr-r"><div class="cr-a color-pos">Claims-free</div></div>
+                </div>
+              </div>
+              <p style="font-size:0.56rem;color:var(--text-tertiary);margin-top:0.6rem;line-height:1.5;">A first paid claim is settled fast and fairly; under the ROP rules it resets milestone progress per the tier schedule — the app shows the impact before you confirm.</p>
+
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══════ EXPLANATORY RAIL ═══════ -->
+    <div class="rail">
+      <span class="badge badge--live"><span class="dot"></span>Live product demo</span>
+
+      <div class="panel-head">
+        <h3>One policyholder, three reasons to stay.</h3>
+        <span class="ph-meta">Eleanor M. · OH</span>
+      </div>
+      <p style="font-size:0.9rem;color:var(--text-secondary);line-height:1.8;margin-bottom:2rem;">
+        Switch the tabs in the app. Each view answers a different question an incumbent carrier cannot:
+        <em style="font-style:italic;color:var(--text);">Where does my money go? What do I get for staying? And what happens when I actually need to claim?</em>
+        The answers are why a return-of-premium book retains better and self-selects into a lower-claim risk pool.
+      </p>
+
+      <div class="grid-gap grid-2" style="grid-template-columns:1fr;margin-bottom:2rem;">
+        <div class="card card--accent">
+          <span class="pill">Savings</span>
+          <h3 style="margin-top:0.85rem;">$9,000 paid — $7,500 already on its way back</h3>
+          <p>At year 6 of 10, Eleanor has paid $9,000. Reaching Bronze returns $7,500 — 50% of the full 10-year premium of $15,000. The premium stops being a sunk cost the moment she sees it tracking home.</p>
+        </div>
+        <div class="card card--accent">
+          <span class="pill pill--pos">Return of Premium</span>
+          <h3 style="margin-top:0.85rem;">A ladder to 100% returned</h3>
+          <p>Bronze $7,500 at year 10, Silver $22,500 at year 20, Gold $45,000 at year 30 — every dollar back, fully recovered. Scaled from the canonical 50/75/100% schedule (proforma v03) to her $1,500 premium.</p>
+        </div>
+        <div class="card card--accent">
+          <span class="pill pill--neut">Claims</span>
+          <h3 style="margin-top:0.85rem;">Same day, not 3–5 days</h3>
+          <p>&lt;3s to aggregate, &lt;30s to underwrite, &lt;2min to a settlement figure, same-day to fund. The same AI cost base that runs an 8% expense ratio runs claims a homeowner actually enjoys.</p>
+        </div>
+      </div>
+
+      <div class="callout" style="margin:0;">
+        <h3>Why this matters to the investor</h3>
+        <p>The experience is the moat. ROP buyers self-select into <strong>lower-claim behavior</strong>, lifting retention well above the ~85% homeowners industry retention average (industry benchmark; verify against carrier data) and producing a structurally better risk pool. A delighted, claims-free policyholder is the most profitable customer in the book — and the engine behind the 83% combined ratio at scale (proforma v03).</p>
+      </div>
+    </div>
+
+  </div>
+</section>
+
+<!-- ═══════════════════════ FOOTER ═══════════════════════ -->
+<footer class="footer">
+  <div class="cl">A sunk cost, turned into a recoverable investment.</div>
+  <p>Self-Insure is the only homeowners experience that shows a policyholder their money coming back — a recoverable balance, a path to 50/75/100% returned, and claims settled the same day. That experience is what compounds retention, self-selects a better risk pool, and turns a household's largest recurring expense into a recoverable investment.</p>
+  <p>Figures shown are this sample homeowner's, computed from the Self-Insure 10-Year Proforma (v03, 6 May 2026) and same-day operating model. All figures are projections and estimates, not guarantees. Verify with a credentialed actuary and qualified counsel before any investment, regulatory, or legal decision.</p>
+  <div class="conf">Confidential — For Qualified Investor Review Only — June 2026</div>
+</footer>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script src="app.js"></script>
+<script>
+document.addEventListener('selfinsure:ready', function () {
+  if (typeof window.Chart === 'undefined') return;
+  var P = SelfInsure.PALETTE;
+
+  /* ── SAVINGS: cumulative premium paid vs. ROP returned over 30 years ──
+     These tab-panels load display:none, so each chart is built inside a hidden
+     container. We capture the chart and register it on its canvas as
+     _selfInsureChart so the tab-switch handler in app.js (which calls
+     canvas._selfInsureChart.resize()) can re-fit it when the tab is shown. */
+  // Years 0..30; cumulative paid = $1,500 * year.
+  var years = ['0','5','10','15','20','25','30'];
+  var paid  = [0, 7500, 15000, 22500, 30000, 37500, 45000];      // cumulative premium paid
+  // returned curve: 0 until each milestone, stepping to the tier dollar value
+  var returned = [0, 0, 7500, 7500, 22500, 22500, 45000];        // Bronze 50% / Silver 75% / Gold 100%
+
+  var savingsCanvas = document.getElementById('savingsChart');
+  var savingsC = new window.Chart(savingsCanvas, {
+    type: 'line',
+    data: {
+      labels: years,
+      datasets: [
+        { label: 'Cumulative paid', data: paid, borderColor: P.neutral,
+          backgroundColor: 'transparent', borderWidth: 2, tension: 0.25,
+          pointRadius: 0, pointHoverRadius: 4, pointBackgroundColor: P.neutral, pointBorderColor: P.bg },
+        { label: 'Returned at milestone', data: returned, borderColor: P.gold,
+          backgroundColor: P.goldFill, fill: true, borderWidth: 2, stepped: true,
+          pointRadius: 0, pointHoverRadius: 4, pointBackgroundColor: P.gold, pointBorderColor: P.bg }
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      scales: SelfInsure.baseScales({ yCallback: function (v) { return '$' + (v/1000) + 'K'; } }),
+      plugins: { legend: { display: false },
+        tooltip: { callbacks: { title: function (i){ return 'Year ' + i[0].label; },
+          label: function (c){ return c.dataset.label + ': ' + SelfInsure.fmtCurrency0(c.parsed.y); } } } }
+    }
+  });
+  savingsCanvas._selfInsureChart = savingsC;
+
+  /* ── ROP: returned at each tier (bar). Built inside the hidden ROP panel,
+     so likewise registered on its canvas for the resize hook. ── */
+  var ropCanvas = document.getElementById('ropChart');
+  var ropC = new window.Chart(ropCanvas, {
+    type: 'bar',
+    data: {
+      labels: ['Bronze · Yr10', 'Silver · Yr20', 'Gold · Yr30'],
+      datasets: [{
+        label: 'Returned',
+        data: [7500, 22500, 45000],
+        backgroundColor: [P.goldFill, P.goldFill, P.posFill],
+        borderColor: [P.gold, P.gold, P.positive],
+        borderWidth: 1, borderRadius: 2, maxBarThickness: 46
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      scales: SelfInsure.baseScales({ yCallback: function (v) { return '$' + (v/1000) + 'K'; } }),
+      plugins: { legend: { display: false },
+        tooltip: { callbacks: { label: function (c){ return SelfInsure.fmtCurrency0(c.parsed.y) + ' returned'; } } } }
+    }
+  });
+  ropCanvas._selfInsureChart = ropC;
+
+  /* animate the ROP-hero progress fill (data-fill outside .reveal/IO group still handled, but force it) */
+  document.querySelectorAll('.rop-hero .rp-fill[data-fill]').forEach(function (el) {
+    requestAnimationFrame(function(){ el.style.width = el.getAttribute('data-fill') + '%'; });
+  });
+});
+</script>
+</body>
+</html>
