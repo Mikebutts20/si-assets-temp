@@ -1,0 +1,805 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Settings · Self-Insure</title>
+  <meta name="description" content="Self-Insure settings — profile, payments & autopay, notifications, paperless, security, and appearance." />
+  <!-- theme before paint, no flash -->
+  <script src="theme.js"></script>
+  <link rel="stylesheet" href="styles.css" />
+
+  <!-- screen-scoped tweaks only; everything else reuses the shared kit -->
+  <style>
+    /* two-column layout: sticky left section-tabs + content */
+    .settings-layout { display: grid; grid-template-columns: 208px 1fr; gap: 28px; align-items: start; }
+    @media (max-width: 920px) { .settings-layout { grid-template-columns: 1fr; gap: 0; } }
+
+    /* left section nav (sticky) */
+    .set-nav {
+      position: sticky; top: calc(var(--topbar-h) + 16px);
+      display: flex; flex-direction: column; gap: 2px;
+    }
+    @media (max-width: 920px) {
+      .set-nav {
+        position: sticky; top: var(--topbar-h); z-index: 20; flex-direction: row;
+        gap: 2px; padding: 8px 0; margin: 0 0 18px; overflow-x: auto; scrollbar-width: none;
+        border-bottom: 1px solid var(--border);
+        background: color-mix(in srgb, var(--bg) 86%, transparent);
+        backdrop-filter: saturate(140%) blur(10px); -webkit-backdrop-filter: saturate(140%) blur(10px);
+      }
+      .set-nav::-webkit-scrollbar { display: none; }
+    }
+    .set-tab {
+      display: flex; align-items: center; gap: 11px; width: 100%;
+      padding: 9px 12px; border-radius: var(--r-ctrl); border: 0; background: transparent;
+      color: var(--text-2); font-size: 13.5px; font-weight: 500; font-family: inherit;
+      text-align: left; white-space: nowrap; cursor: pointer;
+      transition: color .15s var(--ease), background .15s var(--ease);
+    }
+    .set-tab svg { width: 17px; height: 17px; flex: 0 0 17px; color: var(--text-3); transition: color .15s var(--ease); }
+    .set-tab:hover { color: var(--text); background: var(--surface-2); }
+    .set-tab.active { color: var(--ai); background: var(--ai-tint); }
+    .set-tab.active svg { color: var(--ai); }
+
+    .anchor-pad { scroll-margin-top: calc(var(--topbar-h) + 24px); }
+    .set-section { margin-bottom: 26px; }
+
+    /* a settings "row" — label/desc left, control right */
+    .set-row {
+      display: flex; align-items: center; justify-content: space-between; gap: 16px;
+      padding: 15px 0; border-bottom: 1px solid var(--border-2);
+    }
+    .set-row:last-child { border-bottom: 0; }
+    .set-row .sr-main { min-width: 0; }
+    .set-row .sr-title { font-weight: 600; font-size: 14px; color: var(--text); }
+    .set-row .sr-desc { font-size: 12.5px; color: var(--text-2); margin-top: 2px; line-height: 1.5; }
+    .set-row .sr-ctrl { flex: 0 0 auto; }
+
+    /* profile field grid */
+    .profile-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0 18px; }
+    @media (max-width: 560px) { .profile-grid { grid-template-columns: 1fr; } }
+    .profile-grid .field.span-2 { grid-column: 1 / -1; }
+    /* read-only field look until "Edit" is pressed */
+    .settings-profile[data-editing="off"] .input { background: var(--surface-2); border-color: transparent; color: var(--text); cursor: default; }
+    .settings-profile[data-editing="off"] .input:focus { box-shadow: none; }
+    .profile-save-row { display: none; gap: 8px; margin-top: 6px; }
+    .settings-profile[data-editing="on"] .profile-save-row { display: flex; }
+    .settings-profile[data-editing="on"] #profile-edit-btn { display: none; }
+
+    /* method row (mirrors billing.html) */
+    .method-row { display: flex; align-items: center; gap: 13px; padding: 13px 15px; border: 1px solid var(--border); border-radius: var(--r-card); background: var(--surface-2); }
+    .method-brand { width: 42px; height: 28px; border-radius: 6px; background: var(--brand); color: var(--brand-ink); display: grid; place-items: center; font-weight: 700; font-size: 11px; letter-spacing: .03em; flex: 0 0 42px; }
+
+    /* active sessions list */
+    .session-row { display: flex; align-items: center; gap: 13px; padding: 13px 0; border-bottom: 1px solid var(--border-2); }
+    .session-row:last-child { border-bottom: 0; }
+    .session-ico { width: 38px; height: 38px; flex: 0 0 38px; border-radius: 10px; background: var(--surface-2); border: 1px solid var(--border); display: grid; place-items: center; color: var(--text-2); }
+    .session-ico svg { width: 18px; height: 18px; }
+    .session-row .sx-body { flex: 1; min-width: 0; }
+    .session-row .sx-title { font-weight: 600; font-size: 13.5px; color: var(--text); }
+    .session-row .sx-meta { font-size: 12px; color: var(--text-2); margin-top: 1px; }
+
+    /* theme preview swatches in the appearance segmented */
+    .theme-swatch { display: inline-flex; align-items: center; gap: 7px; }
+    .theme-swatch .sw { width: 13px; height: 13px; border-radius: 4px; border: 1px solid var(--border); flex: 0 0 13px; }
+    .theme-swatch .sw.sw-light { background: #ffffff; }
+    .theme-swatch .sw.sw-dark { background: #08090c; }
+    .theme-swatch .sw.sw-system { background: linear-gradient(135deg, #ffffff 0 50%, #08090c 50% 100%); }
+
+    /* danger zone */
+    .danger-card { border-color: var(--danger-tint) !important; }
+    .danger-card .card-title { color: var(--danger); }
+
+    /* small kv list for About */
+    .about-kv { display: grid; grid-template-columns: minmax(120px, 40%) 1fr; gap: 10px 16px; }
+    .about-kv dt { color: var(--text-2); font-size: 13px; }
+    .about-kv dd { margin: 0; color: var(--text); font-size: 13px; font-weight: 500; }
+  </style>
+  <link rel="icon" type="image/svg+xml" href="favicon.svg">
+</head>
+<body>
+  <!-- app.js wraps [data-content] in the persistent shell (sidebar + topbar + FAB) -->
+  <div data-content>
+    <div class="settings" id="settings-root">
+
+      <!-- Header -->
+      <div class="section" style="margin-bottom:8px;">
+        <h2 class="display" style="font-size:28px;">Settings</h2>
+        <p class="muted" style="margin-top:4px;">
+          <span id="set-name-line">Eleanor Marsh</span> ·
+          Policy <strong style="color:var(--text);">SI-OH-204871</strong> ·
+          <span class="pill pill-ai"><span class="dot"></span>Active</span>
+        </p>
+      </div>
+
+      <div class="settings-layout">
+
+        <!-- ============ LEFT SECTION TABS ============ -->
+        <nav class="set-nav" id="set-nav" aria-label="Settings sections">
+          <button class="set-tab active" data-tab="profile">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg>Profile</button>
+          <button class="set-tab" data-tab="payments">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20"/></svg>Payments &amp; autopay</button>
+          <button class="set-tab" data-tab="notifications">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg>Notifications</button>
+          <button class="set-tab" data-tab="paperless">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg>Paperless</button>
+          <button class="set-tab" data-tab="security">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>Security</button>
+          <button class="set-tab" data-tab="appearance">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>Appearance</button>
+          <button class="set-tab" data-tab="about">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 16v-4M12 8h.01"/></svg>About</button>
+        </nav>
+
+        <!-- ============ CONTENT ============ -->
+        <div class="set-content">
+
+          <!-- ---------- PROFILE ---------- -->
+          <section class="set-section anchor-pad" id="profile">
+            <div class="card settings-profile" id="profile-card" data-editing="off">
+              <div class="card-head">
+                <div class="card-title">
+                  <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg>Profile
+                </div>
+                <button class="btn btn-ghost btn-sm" id="profile-edit-btn">Edit</button>
+              </div>
+              <p class="muted tiny" style="margin-bottom:18px;line-height:1.5;">Your contact details and mailing address. These are used for documents, notices, and proof of insurance.</p>
+
+              <div class="profile-grid">
+                <div class="field">
+                  <label for="pf-first">First name</label>
+                  <input class="input" id="pf-first" autocomplete="given-name" readonly />
+                </div>
+                <div class="field">
+                  <label for="pf-last">Last name</label>
+                  <input class="input" id="pf-last" autocomplete="family-name" readonly />
+                </div>
+                <div class="field span-2">
+                  <label for="pf-email">Email</label>
+                  <input class="input" id="pf-email" type="email" autocomplete="email" readonly />
+                </div>
+                <div class="field">
+                  <label for="pf-phone">Phone</label>
+                  <input class="input" id="pf-phone" type="tel" autocomplete="tel" readonly />
+                </div>
+                <div class="field">
+                  <label for="pf-line1">Mailing address</label>
+                  <input class="input" id="pf-line1" autocomplete="address-line1" readonly />
+                </div>
+                <div class="field">
+                  <label for="pf-city">City</label>
+                  <input class="input" id="pf-city" autocomplete="address-level2" readonly />
+                </div>
+                <div class="field">
+                  <label for="pf-state">State</label>
+                  <input class="input" id="pf-state" autocomplete="address-level1" readonly />
+                </div>
+                <div class="field">
+                  <label for="pf-zip">ZIP</label>
+                  <input class="input" id="pf-zip" inputmode="numeric" autocomplete="postal-code" readonly />
+                </div>
+              </div>
+
+              <div class="profile-save-row">
+                <button class="btn btn-primary btn-sm" id="profile-save-btn">Save changes</button>
+                <button class="btn btn-ghost btn-sm" id="profile-cancel-btn">Cancel</button>
+              </div>
+            </div>
+          </section>
+
+          <!-- ---------- PAYMENTS & AUTOPAY ---------- -->
+          <section class="set-section anchor-pad" id="payments">
+            <div class="card">
+              <div class="card-head">
+                <div class="card-title">
+                  <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20"/></svg>Payments &amp; autopay
+                </div>
+                <a class="card-link" href="billing.html">Full billing
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg></a>
+              </div>
+
+              <!-- Current method -->
+              <div style="font-weight:600;font-size:14px;margin-bottom:10px;">Payment method</div>
+              <div class="method-row" style="margin-bottom:10px;">
+                <span class="method-brand">VISA</span>
+                <div style="flex:1;min-width:0;">
+                  <div style="font-weight:600;font-size:13.5px;">Visa ending <span id="set-last4">4242</span></div>
+                  <div class="tiny muted">Expires <span id="set-exp">08/28</span></div>
+                </div>
+                <span class="pill pill-ai" style="height:24px;"><span class="dot"></span>Default</span>
+              </div>
+              <button class="btn btn-ghost btn-sm" id="add-method-btn" style="margin-bottom:4px;">Add payment method</button>
+
+              <hr style="border:0;border-top:1px solid var(--border);margin:20px 0;" />
+
+              <!-- Autopay -->
+              <div class="set-row">
+                <div class="sr-main">
+                  <div class="sr-title">Autopay</div>
+                  <div class="sr-desc" id="set-autopay-desc">We charge $125 to your Visa on the 1st of each month — nothing to do.</div>
+                </div>
+                <div class="sr-ctrl">
+                  <label class="switch" aria-label="Toggle autopay">
+                    <input type="checkbox" id="set-autopay-toggle" checked />
+                    <span class="track"></span>
+                  </label>
+                </div>
+              </div>
+
+              <!-- Billing date -->
+              <div class="set-row">
+                <div class="sr-main">
+                  <div class="sr-title">Billing date</div>
+                  <div class="sr-desc">Your premium is charged on the <strong style="color:var(--text);">1st</strong> of each month. Next charge: <strong style="color:var(--text);" id="set-next-charge">$125 on Jul 1</strong>.</div>
+                </div>
+                <div class="sr-ctrl">
+                  <button class="btn btn-ghost btn-sm" id="pay-ahead-link">Pay ahead</button>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <!-- ---------- NOTIFICATIONS ---------- -->
+          <section class="set-section anchor-pad" id="notifications">
+            <div class="card">
+              <div class="card-head"><div class="card-title">
+                <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg>Notifications
+              </div></div>
+              <p class="muted tiny" style="margin-bottom:8px;line-height:1.5;">Choose how we reach you. Claim updates are always sent for safety — you can pick the channels.</p>
+
+              <!-- header row of channels -->
+              <div style="display:grid;grid-template-columns:1fr 64px 64px 64px;gap:8px;align-items:center;padding:10px 0 8px;border-bottom:1px solid var(--border);">
+                <div></div>
+                <div class="eyebrow center">Email</div>
+                <div class="eyebrow center">SMS</div>
+                <div class="eyebrow center">Push</div>
+              </div>
+              <div id="notif-rows"></div>
+            </div>
+          </section>
+
+          <!-- ---------- PAPERLESS & DOCUMENTS ---------- -->
+          <section class="set-section anchor-pad" id="paperless">
+            <div class="card">
+              <div class="card-head"><div class="card-title">
+                <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg>Paperless &amp; documents
+              </div></div>
+
+              <div class="set-row">
+                <div class="sr-main">
+                  <div class="sr-title">Paperless billing &amp; documents</div>
+                  <div class="sr-desc">Statements, receipts, and policy documents go to <span id="set-paperless-email"></span> — no paper mail.</div>
+                </div>
+                <div class="sr-ctrl">
+                  <label class="switch" aria-label="Toggle paperless">
+                    <input type="checkbox" id="set-paperless-toggle" checked />
+                    <span class="track"></span>
+                  </label>
+                </div>
+              </div>
+
+              <div class="set-row">
+                <div class="sr-main">
+                  <div class="sr-title">Document center</div>
+                  <div class="sr-desc">Your declarations page, policy contract, ROP addendum, and digital ID card.</div>
+                </div>
+                <div class="sr-ctrl">
+                  <a class="btn btn-ghost btn-sm" href="documents.html">Open documents</a>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <!-- ---------- SECURITY ---------- -->
+          <section class="set-section anchor-pad" id="security">
+            <div class="card">
+              <div class="card-head"><div class="card-title">
+                <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>Security
+              </div></div>
+
+              <div class="set-row">
+                <div class="sr-main">
+                  <div class="sr-title">Password</div>
+                  <div class="sr-desc">Last changed in January 2026. Use a strong, unique password.</div>
+                </div>
+                <div class="sr-ctrl">
+                  <button class="btn btn-ghost btn-sm" id="change-pw-btn">Change password</button>
+                </div>
+              </div>
+
+              <div class="set-row">
+                <div class="sr-main">
+                  <div class="sr-title">Two-factor authentication</div>
+                  <div class="sr-desc" id="set-2fa-desc">Add a one-time code at sign-in for an extra layer of protection.</div>
+                </div>
+                <div class="sr-ctrl">
+                  <label class="switch" aria-label="Toggle two-factor authentication">
+                    <input type="checkbox" id="set-2fa-toggle" />
+                    <span class="track"></span>
+                  </label>
+                </div>
+              </div>
+
+              <div style="padding-top:16px;">
+                <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:6px;">
+                  <div class="sr-title">Active sessions</div>
+                  <button class="btn btn-danger-ghost btn-sm" id="signout-all-btn">Sign out everywhere</button>
+                </div>
+                <div id="session-rows"></div>
+              </div>
+            </div>
+          </section>
+
+          <!-- ---------- APPEARANCE ---------- -->
+          <section class="set-section anchor-pad" id="appearance">
+            <div class="card">
+              <div class="card-head"><div class="card-title">
+                <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>Theme
+              </div></div>
+
+              <div class="set-row">
+                <div class="sr-main">
+                  <div class="sr-title">Appearance</div>
+                  <div class="sr-desc" id="set-theme-desc">Choose how Self-Insure looks. "System" follows your device.</div>
+                </div>
+                <div class="sr-ctrl">
+                  <div class="segmented" id="theme-seg" role="group" aria-label="Theme">
+                    <button type="button" data-theme-mode="system" aria-pressed="false"><span class="theme-swatch"><span class="sw sw-system"></span>System</span></button>
+                    <button type="button" data-theme-mode="light" aria-pressed="false"><span class="theme-swatch"><span class="sw sw-light"></span>Light</span></button>
+                    <button type="button" data-theme-mode="dark" aria-pressed="false"><span class="theme-swatch"><span class="sw sw-dark"></span>Dark</span></button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <!-- ---------- ABOUT + DANGER ZONE ---------- -->
+          <section class="set-section anchor-pad" id="about">
+            <div class="card section">
+              <div class="card-head"><div class="card-title">
+                <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 16v-4M12 8h.01"/></svg>About
+              </div></div>
+              <dl class="about-kv" id="about-kv"></dl>
+              <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:18px;">
+                <button class="chip chip-ai" data-ask="I need to talk to a person about my policy">Contact support</button>
+                <button class="btn btn-ghost btn-sm" id="idcard-btn">View ID card</button>
+              </div>
+            </div>
+
+            <!-- Danger zone -->
+            <div class="card danger-card">
+              <div class="card-head"><div class="card-title">Cancel policy</div></div>
+              <p class="muted tiny" style="line-height:1.5;margin-bottom:14px;">
+                Cancelling ends your coverage and forfeits the <strong style="color:var(--text);">$7,500</strong> you're on track to get back at year 10.
+                We'll always connect you with a specialist first — nothing is cancelled instantly.
+              </p>
+              <button class="btn btn-danger-ghost btn-sm" id="cancel-policy-btn">Cancel my policy</button>
+            </div>
+          </section>
+
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+  <script src="account.js"></script>
+  <script src="intents.js"></script>
+  <script src="app.js"></script>
+  <script>
+    document.addEventListener("selfinsure:ready", function () {
+      var A = SI.account, fmt = SI.fmt, B = A.billing;
+      function st() { return SI.state.get(); }
+
+      /* ============================================================
+         HEADER + PROFILE (read from session override or canonical)
+         ============================================================ */
+      function currentProfile() {
+        var p = st().profile || {};
+        var addr = p.address || A.member.address;
+        return {
+          firstName: p.firstName || A.member.firstName,
+          lastName: p.lastName || A.member.lastName,
+          fullName: p.fullName || A.member.fullName,
+          email: p.email || A.member.email,
+          phone: p.phone || A.member.phone,
+          line1: addr.line1, city: addr.city, state: addr.state, zip: addr.zip
+        };
+      }
+      function paintProfile() {
+        var p = currentProfile();
+        document.getElementById("pf-first").value = p.firstName;
+        document.getElementById("pf-last").value = p.lastName;
+        document.getElementById("pf-email").value = p.email;
+        document.getElementById("pf-phone").value = p.phone;
+        document.getElementById("pf-line1").value = p.line1;
+        document.getElementById("pf-city").value = p.city;
+        document.getElementById("pf-state").value = p.state;
+        document.getElementById("pf-zip").value = p.zip;
+        document.getElementById("set-name-line").textContent = p.fullName;
+      }
+      paintProfile();
+
+      var profCard = document.getElementById("profile-card");
+      var profInputs = profCard.querySelectorAll(".input");
+      function setEditing(on) {
+        profCard.setAttribute("data-editing", on ? "on" : "off");
+        profInputs.forEach(function (i) { i.readOnly = !on; });
+        if (on) { var f = document.getElementById("pf-first"); f.focus(); f.select(); }
+      }
+      document.getElementById("profile-edit-btn").addEventListener("click", function () { setEditing(true); });
+      document.getElementById("profile-cancel-btn").addEventListener("click", function () { paintProfile(); setEditing(false); });
+      document.getElementById("profile-save-btn").addEventListener("click", function (e) {
+        var first = document.getElementById("pf-first").value.trim();
+        var last = document.getElementById("pf-last").value.trim();
+        var email = document.getElementById("pf-email").value.trim();
+        if (!first || !last || !email) {
+          SI.ui.toast("Please fill in your name and email before saving.", "warning", { title: "Missing details" });
+          return;
+        }
+        var btn = e.currentTarget; btn.innerHTML = '<span class="spinner"></span>Saving…'; btn.disabled = true;
+        var profile = {
+          firstName: first, lastName: last, fullName: first + " " + last,
+          email: email, phone: document.getElementById("pf-phone").value.trim(),
+          address: {
+            line1: document.getElementById("pf-line1").value.trim(),
+            city: document.getElementById("pf-city").value.trim(),
+            state: document.getElementById("pf-state").value.trim(),
+            zip: document.getElementById("pf-zip").value.trim()
+          }
+        };
+        setTimeout(function () {
+          SI.state.patch("profile", profile);
+          // live-update the shell chip + avatar so the change is visible everywhere
+          var initials = (first[0] || "") + (last[0] || "");
+          var sideName = document.getElementById("si-side-name");
+          if (sideName) sideName.textContent = profile.fullName;
+          document.querySelectorAll(".avatar").forEach(function (a) { a.textContent = initials.toUpperCase(); });
+          paintProfile();
+          setEditing(false);
+          btn.innerHTML = "Save changes"; btn.disabled = false;
+          SI.ui.toast("Your profile was updated.", "ai", { title: "Profile saved" });
+        }, 800);
+      });
+
+      /* ============================================================
+         PAYMENTS & AUTOPAY
+         ============================================================ */
+      function paintMethod() {
+        document.getElementById("set-last4").textContent = st().last4;
+        document.getElementById("set-exp").textContent = B.paymentMethod.exp;
+      }
+      paintMethod();
+      document.getElementById("set-next-charge").textContent =
+        fmt.currency0(B.nextPaymentAmount) + " on " + fmt.dateShort(B.nextPaymentDate);
+
+      var apToggle = document.getElementById("set-autopay-toggle");
+      var apDesc = document.getElementById("set-autopay-desc");
+      function paintAutopay() {
+        var on = st().autopay;
+        apToggle.checked = on;
+        apDesc.innerHTML = on
+          ? "We charge " + fmt.currency0(B.premiumMonthly) + " to your Visa •" + st().last4 + " on the 1st of each month — nothing to do."
+          : "Autopay is <strong style=\"color:var(--warning);\">off</strong> — pay your " + fmt.currency0(B.premiumMonthly) + " manually by the 1st each month.";
+      }
+      paintAutopay();
+      apToggle.addEventListener("change", function () {
+        if (!apToggle.checked) {
+          apToggle.checked = true; // revert until confirmed
+          SI.ui.confirm(
+            "You'll need to pay your " + fmt.currency0(B.premiumMonthly) + " premium manually each month by the 1st. A missed payment can affect your coverage and your Return-of-Premium track.",
+            { title: "Turn off autopay?", confirm: "Turn off autopay", cancel: "Keep autopay on", danger: true }
+          ).then(function (ok) {
+            if (ok) {
+              SI.state.patch("autopay", false); paintAutopay();
+              SI.ui.toast("Autopay turned off. Remember to pay by the 1st each month.", "warning", { title: "Autopay off" });
+            }
+          });
+        } else {
+          SI.state.patch("autopay", true); paintAutopay();
+          SI.ui.toast("Autopay is back on — " + fmt.currency0(B.premiumMonthly) + " will run on the 1st.", "ai", { title: "Autopay on" });
+        }
+      });
+
+      /* Add payment method — reuses the billing.html card-fields modal pattern */
+      document.getElementById("add-method-btn").addEventListener("click", function () {
+        var node = document.createElement("div");
+        node.innerHTML =
+          '<div class="modal-head"><div class="modal-title">Add payment method</div>' +
+          '<button class="modal-close" data-close aria-label="Close">' + SI.icon("x") + '</button></div>' +
+          '<div class="modal-body">' +
+            '<div class="field" style="margin-bottom:14px;"><label for="cc-num">Card number</label>' +
+            '<input class="input" id="cc-num" inputmode="numeric" autocomplete="cc-number" placeholder="4242 4242 4242 4242" value="4242 4242 4242 4242" /></div>' +
+            '<div style="display:flex;gap:12px;">' +
+              '<div class="field" style="flex:1;"><label for="cc-exp">Expiry</label>' +
+              '<input class="input" id="cc-exp" autocomplete="cc-exp" placeholder="MM/YY" value="08/28" /></div>' +
+              '<div class="field" style="flex:1;"><label for="cc-cvc">CVC</label>' +
+              '<input class="input" id="cc-cvc" inputmode="numeric" autocomplete="cc-csc" placeholder="123" value="" /></div>' +
+            '</div>' +
+            '<p class="tiny muted-3" style="margin-top:6px;">Demo only — no real card is stored or charged.</p>' +
+            '<div class="err-msg" id="cc-err" style="display:none;color:var(--danger);font-size:12px;margin-top:8px;"></div>' +
+          '</div>' +
+          '<div class="modal-foot"><button class="btn btn-ghost" data-close>Cancel</button>' +
+          '<button class="btn btn-primary" data-save>Save card</button></div>';
+        var m = SI.ui.openModal(node);
+        m.querySelector("[data-save]").addEventListener("click", function (e) {
+          var num = m.querySelector("#cc-num").value.replace(/[^0-9]/g, "");
+          var err = m.querySelector("#cc-err");
+          if (num.length < 15) { err.textContent = "Enter a valid card number (try 4242 4242 4242 4242)."; err.style.display = "block"; return; }
+          var last4 = num.slice(-4);
+          var btn = e.currentTarget; btn.innerHTML = '<span class="spinner"></span>Saving…'; btn.disabled = true;
+          setTimeout(function () {
+            SI.state.patch("last4", last4);
+            paintMethod(); paintAutopay();
+            SI.ui.closeModal();
+            SI.ui.toast("Payment method updated to Visa •" + last4 + ".", "ai", { title: "Card updated" });
+          }, 900);
+        });
+      });
+
+      document.getElementById("pay-ahead-link").addEventListener("click", function () { SI.flows.paySheet(); });
+
+      /* ============================================================
+         NOTIFICATIONS — real toggles, persist in localStorage
+         ============================================================ */
+      var NOTIF_KEY = "si-notif-prefs";
+      var NOTIF_DEFAULT = {
+        claims:   { email: true,  sms: true,  push: true },
+        payments: { email: true,  sms: false, push: true },
+        policy:   { email: true,  sms: false, push: false }
+      };
+      var NOTIF_ROWS = [
+        { key: "claims",   title: "Claim updates",       desc: "Status changes and payouts on your claims." },
+        { key: "payments", title: "Payment reminders",   desc: "Upcoming charges, receipts, and autopay alerts." },
+        { key: "policy",   title: "Policy changes",      desc: "Renewals, ROP milestones, and coverage updates." }
+      ];
+      function readNotifPrefs() {
+        try {
+          var raw = localStorage.getItem(NOTIF_KEY);
+          if (!raw) return JSON.parse(JSON.stringify(NOTIF_DEFAULT));
+          var saved = JSON.parse(raw), out = JSON.parse(JSON.stringify(NOTIF_DEFAULT));
+          Object.keys(out).forEach(function (k) { if (saved[k]) Object.keys(out[k]).forEach(function (ch) { if (typeof saved[k][ch] === "boolean") out[k][ch] = saved[k][ch]; }); });
+          return out;
+        } catch (e) { return JSON.parse(JSON.stringify(NOTIF_DEFAULT)); }
+      }
+      function writeNotifPrefs(p) { try { localStorage.setItem(NOTIF_KEY, JSON.stringify(p)); } catch (e) {} }
+      var notifPrefs = readNotifPrefs();
+      var notifRowsEl = document.getElementById("notif-rows");
+      function notifSwitch(rowKey, ch) {
+        var on = notifPrefs[rowKey][ch];
+        return '<label class="switch" style="margin:0 auto;display:block;" aria-label="' + ch + ' for ' + rowKey + '">' +
+          '<input type="checkbox" data-nrow="' + rowKey + '" data-nch="' + ch + '"' + (on ? " checked" : "") + ' />' +
+          '<span class="track"></span></label>';
+      }
+      notifRowsEl.innerHTML = NOTIF_ROWS.map(function (r) {
+        return '<div style="display:grid;grid-template-columns:1fr 64px 64px 64px;gap:8px;align-items:center;padding:14px 0;border-bottom:1px solid var(--border-2);">' +
+          '<div class="sr-main"><div class="sr-title">' + r.title + '</div><div class="sr-desc">' + r.desc + '</div></div>' +
+          notifSwitch(r.key, "email") + notifSwitch(r.key, "sms") + notifSwitch(r.key, "push") +
+          '</div>';
+      }).join("");
+      // strip the last bottom border
+      var lastNotif = notifRowsEl.lastElementChild; if (lastNotif) lastNotif.style.borderBottom = "0";
+      notifRowsEl.querySelectorAll("[data-nrow]").forEach(function (input) {
+        input.addEventListener("change", function () {
+          var row = input.getAttribute("data-nrow"), ch = input.getAttribute("data-nch");
+          // safety: claim email can't be fully turned off — keep at least one claims channel on
+          if (row === "claims" && !input.checked) {
+            var others = ["email", "sms", "push"].filter(function (c) { return c !== ch; }).some(function (c) { return notifPrefs.claims[c]; });
+            if (!others) {
+              input.checked = true;
+              SI.ui.toast("Keep at least one channel on for claim updates so you never miss a payout.", "info", { title: "Claim alerts stay on" });
+              return;
+            }
+          }
+          notifPrefs[row][ch] = input.checked;
+          writeNotifPrefs(notifPrefs);
+          SI.ui.toast(r2label(row) + " " + chLabel(ch) + " " + (input.checked ? "on" : "off") + ".", input.checked ? "ai" : "info");
+        });
+      });
+      function r2label(k) { var m = { claims: "Claim updates", payments: "Payment reminders", policy: "Policy changes" }; return m[k] || k; }
+      function chLabel(c) { return c === "sms" ? "SMS" : c === "push" ? "push" : "email"; }
+
+      /* ============================================================
+         PAPERLESS
+         ============================================================ */
+      var paperless = document.getElementById("set-paperless-toggle");
+      document.getElementById("set-paperless-email").textContent = currentProfile().email;
+      paperless.checked = st().paperless;
+      paperless.addEventListener("change", function () {
+        SI.state.patch("paperless", paperless.checked);
+        if (paperless.checked) SI.ui.toast("Paperless on — documents go to " + currentProfile().email + ".", "ai", { title: "Paperless on" });
+        else SI.ui.toast("Paperless off — we'll mail paper statements to your address.", "info", { title: "Paperless off" });
+      });
+
+      /* ============================================================
+         SECURITY — change password modal, 2FA toggle, sessions
+         ============================================================ */
+      document.getElementById("change-pw-btn").addEventListener("click", function () {
+        var node = document.createElement("div");
+        node.innerHTML =
+          '<div class="modal-head"><div class="modal-title">Change password</div>' +
+          '<button class="modal-close" data-close aria-label="Close">' + SI.icon("x") + '</button></div>' +
+          '<div class="modal-body">' +
+            '<div class="field"><label for="pw-cur">Current password</label>' +
+            '<input class="input" id="pw-cur" type="password" value="••••••••" autocomplete="current-password" /></div>' +
+            '<div class="field"><label for="pw-new">New password</label>' +
+            '<input class="input" id="pw-new" type="password" placeholder="At least 8 characters" autocomplete="new-password" /></div>' +
+            '<div class="field" style="margin-bottom:4px;"><label for="pw-conf">Confirm new password</label>' +
+            '<input class="input" id="pw-conf" type="password" placeholder="Re-enter new password" autocomplete="new-password" /></div>' +
+            '<div class="err-msg" id="pw-err" style="display:none;color:var(--danger);font-size:12px;margin-top:8px;"></div>' +
+          '</div>' +
+          '<div class="modal-foot"><button class="btn btn-ghost" data-close>Cancel</button>' +
+          '<button class="btn btn-primary" data-save>Update password</button></div>';
+        var m = SI.ui.openModal(node);
+        m.querySelector("[data-save]").addEventListener("click", function (e) {
+          var npw = m.querySelector("#pw-new").value, conf = m.querySelector("#pw-conf").value;
+          var err = m.querySelector("#pw-err");
+          if (npw.length < 8) { err.textContent = "Your new password must be at least 8 characters."; err.style.display = "block"; return; }
+          if (npw !== conf) { err.textContent = "The new passwords don't match."; err.style.display = "block"; return; }
+          var btn = e.currentTarget; btn.innerHTML = '<span class="spinner"></span>Updating…'; btn.disabled = true;
+          setTimeout(function () { SI.ui.closeModal(); SI.ui.toast("Your password was updated.", "ai", { title: "Password changed" }); }, 800);
+        });
+      });
+
+      var twofa = document.getElementById("set-2fa-toggle");
+      var twofaDesc = document.getElementById("set-2fa-desc");
+      var TWOFA_KEY = "si-2fa";
+      try { twofa.checked = localStorage.getItem(TWOFA_KEY) === "1"; } catch (e) {}
+      function paint2fa() {
+        twofaDesc.innerHTML = twofa.checked
+          ? "Two-factor is <strong style=\"color:var(--ai);\">on</strong> — we'll text a one-time code to your phone at sign-in."
+          : "Add a one-time code at sign-in for an extra layer of protection.";
+      }
+      paint2fa();
+      twofa.addEventListener("change", function () {
+        try { localStorage.setItem(TWOFA_KEY, twofa.checked ? "1" : "0"); } catch (e) {}
+        paint2fa();
+        SI.ui.toast(twofa.checked ? "Two-factor authentication is on." : "Two-factor authentication is off.", twofa.checked ? "ai" : "info", { title: "Two-factor" });
+      });
+
+      // active sessions list
+      var SESSIONS = [
+        { ico: "home",  title: "This device · Chrome on Windows", meta: "Columbus, OH · active now", current: true },
+        { ico: "phone", title: "iPhone · Self-Insure app",        meta: "Columbus, OH · 2 hours ago" },
+        { ico: "grid",  title: "Safari on macOS",                 meta: "Columbus, OH · yesterday" }
+      ];
+      var sessRowsEl = document.getElementById("session-rows");
+      function renderSessions() {
+        sessRowsEl.innerHTML = SESSIONS.map(function (s) {
+          return '<div class="session-row">' +
+            '<span class="session-ico">' + SI.icon(s.ico) + '</span>' +
+            '<div class="sx-body"><div class="sx-title">' + s.title + '</div><div class="sx-meta">' + s.meta + '</div></div>' +
+            (s.current ? '<span class="pill pill-ai" style="height:24px;"><span class="dot"></span>Current</span>'
+                       : '<button class="btn btn-ghost btn-sm" data-revoke="' + s.title + '">Sign out</button>') +
+          '</div>';
+        }).join("");
+        sessRowsEl.querySelectorAll("[data-revoke]").forEach(function (b) {
+          b.addEventListener("click", function () {
+            var title = b.getAttribute("data-revoke");
+            SESSIONS = SESSIONS.filter(function (s) { return s.title !== title; });
+            renderSessions();
+            SI.ui.toast("Signed out of “" + title + "”.", "info");
+          });
+        });
+      }
+      renderSessions();
+      document.getElementById("signout-all-btn").addEventListener("click", function () {
+        SI.ui.confirm(
+          "This signs you out of every other device. You'll stay signed in here.",
+          { title: "Sign out everywhere?", confirm: "Sign out other sessions", cancel: "Cancel" }
+        ).then(function (ok) {
+          if (ok) {
+            SESSIONS = SESSIONS.filter(function (s) { return s.current; });
+            renderSessions();
+            SI.ui.toast("Signed out of all other sessions.", "ai", { title: "Sessions cleared" });
+          }
+        });
+      });
+
+      /* ============================================================
+         APPEARANCE — wired to the REAL theme system (SITheme)
+         ============================================================ */
+      var themeSeg = document.getElementById("theme-seg");
+      var themeBtns = Array.prototype.slice.call(themeSeg.querySelectorAll("[data-theme-mode]"));
+      var themeDesc = document.getElementById("set-theme-desc");
+      function currentThemeMode() {
+        // "System" when there is no explicit override; else the stored light/dark.
+        return (window.SITheme && window.SITheme.hasOverride()) ? window.SITheme.get() : "system";
+      }
+      function paintThemeSeg() {
+        var mode = currentThemeMode();
+        themeBtns.forEach(function (b) {
+          var on = b.getAttribute("data-theme-mode") === mode;
+          b.classList.toggle("active", on);
+          b.setAttribute("aria-pressed", String(on));
+        });
+        var sys = window.SITheme ? window.SITheme.system() : "dark";
+        themeDesc.innerHTML = mode === "system"
+          ? "Following your device — currently <strong style=\"color:var(--text);\">" + sys + "</strong>. Pick Light or Dark to override."
+          : "Set to <strong style=\"color:var(--text);\">" + mode + "</strong>. Choose System to follow your device.";
+      }
+      themeBtns.forEach(function (b) {
+        b.addEventListener("click", function () {
+          var mode = b.getAttribute("data-theme-mode");
+          if (window.SITheme) {
+            if (mode === "system") window.SITheme.clearOverride();
+            else window.SITheme.set(mode); // writes localStorage "si-theme" + re-themes the whole app
+          }
+          paintThemeSeg();
+        });
+      });
+      paintThemeSeg();
+      // keep the segmented in sync if the top-bar toggle (or OS) changes the theme
+      window.addEventListener("selfinsure:themechange", paintThemeSeg);
+
+      /* ============================================================
+         ABOUT
+         ============================================================ */
+      document.getElementById("about-kv").innerHTML =
+        '<dt>Member</dt><dd>' + A.member.fullName + '</dd>' +
+        '<dt>Member ID</dt><dd>' + A.member.id + '</dd>' +
+        '<dt>Policy number</dt><dd>' + A.policy.number + '</dd>' +
+        '<dt>Product</dt><dd>' + A.policy.product + '</dd>' +
+        '<dt>Member since</dt><dd>' + A.member.memberSinceYear + '</dd>' +
+        '<dt>App version</dt><dd>Self-Insure Portal 1.0.0</dd>';
+      document.getElementById("idcard-btn").addEventListener("click", function () { SI.flows.idCard(); });
+
+      /* ============================================================
+         DANGER ZONE — calm, non-destructive retention flow
+         ============================================================ */
+      document.getElementById("cancel-policy-btn").addEventListener("click", function () {
+        SI.ui.confirm(
+          "Before you go: cancelling forfeits the " + fmt.currency0(A.rop.bronzeReturnAmount) +
+          " you're on track to get back at year 10. A specialist can review options like adjusting coverage or pausing — would you like us to reach out?",
+          { title: "Cancel your policy?", confirm: "Have a specialist call me", cancel: "Keep my policy", danger: true }
+        ).then(function (ok) {
+          if (ok) {
+            SI.state.addActivity({ id: "ACT-" + Date.now(), icon: "doc", tone: "info", date: "2026-06-24", time: nowTime(), title: "Cancellation review requested", body: "A retention specialist will call you to confirm. Nothing was cancelled.", link: "settings.html", unread: true });
+            SI.ui.toast("A specialist will call you to confirm — nothing was cancelled today.", "info", { title: "We'll be in touch", duration: 4200 });
+          }
+        });
+      });
+      function nowTime() {
+        var d = new Date(), h = d.getHours(), mm = ("0" + d.getMinutes()).slice(-2);
+        var ap = h >= 12 ? "PM" : "AM"; h = h % 12 || 12; return h + ":" + mm + " " + ap;
+      }
+
+      /* ============================================================
+         ASSISTANT CHIPS (data-ask) → open the dock pre-seeded
+         ============================================================ */
+      document.querySelectorAll("[data-ask]").forEach(function (b) {
+        b.addEventListener("click", function () { SI.assistant.send(b.getAttribute("data-ask")); });
+      });
+
+      /* ============================================================
+         LEFT SECTION TABS — scroll-spy + smooth scroll (mirrors policy.html)
+         ============================================================ */
+      var tabs = Array.prototype.slice.call(document.querySelectorAll(".set-tab"));
+      var sections = tabs.map(function (t) { return document.getElementById(t.getAttribute("data-tab")); });
+      tabs.forEach(function (t) {
+        t.addEventListener("click", function () {
+          var target = document.getElementById(t.getAttribute("data-tab"));
+          if (target) target.scrollIntoView({ behavior: "smooth", block: "start" });
+        });
+      });
+      function setActive(id) { tabs.forEach(function (t) { t.classList.toggle("active", t.getAttribute("data-tab") === id); }); }
+      if ("IntersectionObserver" in window) {
+        var spy = new IntersectionObserver(function (entries) {
+          entries.forEach(function (en) { if (en.isIntersecting) setActive(en.target.id); });
+        }, { rootMargin: "-30% 0px -60% 0px", threshold: 0 });
+        sections.forEach(function (s) { if (s) spy.observe(s); });
+      }
+
+      /* deep link (#security, #appearance, etc.) */
+      if (location.hash) {
+        var hid = location.hash.slice(1);
+        var hel = document.getElementById(hid);
+        if (hel) setTimeout(function () { hel.scrollIntoView({ behavior: "smooth", block: "start" }); setActive(hid); }, 240);
+      }
+    });
+  </script>
+</body>
+</html>
